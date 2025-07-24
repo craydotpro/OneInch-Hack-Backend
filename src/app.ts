@@ -1,7 +1,11 @@
 import express from 'express';
+import connectDB from './config/database';
 
 const app = express();
 const PORT = process.env.PORT || 5001;
+
+// Connect to MongoDB
+connectDB();
 
 // Middleware
 app.use(express.json());
