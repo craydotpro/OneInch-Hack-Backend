@@ -10,10 +10,15 @@ const AdvanceSLTPSchema = new Schema({
   tp: { type: SLTPConfigSchema, required: false }
 }, { _id: false })
 
+export enum PositionType {
+  MARKET = 'market',
+  LIMIT = 'limit'
+}
+
 const PositionSchema = new Schema({
   type: {
     type: String,
-    enum: ['market', 'limit'],
+    enum: PositionType,
     required: true
   },
   wallet: {
