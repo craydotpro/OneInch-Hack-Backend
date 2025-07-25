@@ -1,4 +1,7 @@
 import { Request, Response, Router } from 'express'
+import { Position } from '../models/postition'
+import { createOrder } from '../services/orderService'
+import { prepareSmartBuyRoute } from '../services/routingService'
 
 const router = Router({ mergeParams: true })
 
@@ -7,7 +10,7 @@ router.get('/health', async (_, res) => {
 })
 
 // POST /api/position/prepare
-router.post('/prepare', async (req: Request, res: Response) => {
+router.post('/prepare-buy', async (req: Request, res: Response) => {
   try {
     // buy / (sell- relayer)
     const {
@@ -23,13 +26,34 @@ router.post('/prepare', async (req: Request, res: Response) => {
     // get gasprice
     // get token price
 
-     //prepare route return destination details
+    const route = await prepareSmartBuyRoute(userAddress, toToken, amountInUSD) //return destination details
     // create and store orderHash
-    // prepare order to sign
-    
-    // Create Order
-    // if destination token is not stable, prep 1inch swapData
+    const positionParams = {
+      userAddress,
+      toToken,
+      type,
+      amountInUSD,
+      qty: route.estimatedQty,
+      slippage: 0.5,
+      triggerPrice,
+      advanceSLTP,
+      deadline: Math.floor(Date.now() / 1000) + 300
+    }
+
     // save positionParams to database
+    // prepare order to sign
+    const payParams = {
+      senderAddress: userAddress,
+      receiverAddress: userAddress,
+      amount: amountInUSD, // amount in USD
+      destinationChain: route.destinationChain, // comes from route
+      destinationToken: route.destinationToken, // comes from route
+      orderType: 'p2p', // dapp
+    }
+    // Create Order
+    const order = await createOrder(payParams) // if destination token is not stable, prep 1inch swap data
+    const position = await Position.create(positionParams)
+    // return order data to sign
     res.json({
       'message': 'Position prepared successfully',
     })
@@ -95,8 +119,25 @@ router.post('/prepare', async (req: Request, res: Response) => {
 // POST /api/position/submit
 router.post('/submit', async (req: Request, res: Response) => {
   try {
-    // store signed positionParams
-    // execute position
+    const { signedPayload, signature, swapData, routeInfo } = req.body
+
+    const valid = verifySignature(signedPayload.wallet, signedPayload, signature)
+    if (!valid) {
+      return res.status(400).json({ error: 'Invalid signature' })
+    }
+
+    const position = await Position.create({
+      ...signedPayload,
+      status: 'pending',
+      signature,
+      routeInfo,
+      createdAt: new Date()
+    })
+
+    res.json({
+      positionId: position._id,
+      status: position.status
+    })
   } catch (err) {
     console.error('[submitPosition]', err)
     res.status(500).json({ error: 'Failed to submit position' })
