@@ -1,7 +1,12 @@
 import express from 'express';
+import listEndpoints from 'express-list-endpoints';
+
+import router from './apis';
 import connectDB from './config/database';
 
+
 const app = express();
+
 const PORT = process.env.PORT || 5001;
 
 // Connect to MongoDB
@@ -11,7 +16,15 @@ connectDB();
 app.use(express.json());
 
 // Routes
-// app.use('/api', routes);
+app.use('/api', router);
+
+
+// list endpoints
+console.log('-----------------------------------------')
+listEndpoints(app).forEach(c => {
+  console.log(`${c.methods.join(',')} -> ${c.path}`)
+})
+console.log('-----------------------------------------')
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
