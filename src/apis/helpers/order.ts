@@ -214,6 +214,11 @@ export const hashOrderOutput = (output: IOutput) => {
   )
 }
 
+export const hashFullfillOrder = (params: { orderHash: string; solverAddress: string }) => {
+  return  keccak256(encodeAbiParameters([{ type: "bytes32" }, { type: "address" }], [params.orderHash as Hex, params.solverAddress as Hex]))
+
+}
+
 export const hashOrderAction = (action: IDestinationAction) => {
   return keccak256(encodeAbiParameters([{ type: "bytes32" }, { type: "bytes32" }, { type: "uint256" }], [DESTINATION_ACTION_TYPEHASH, keccak256(action.payload) as Hex, BigInt(action.gasLimit)]))
 }
