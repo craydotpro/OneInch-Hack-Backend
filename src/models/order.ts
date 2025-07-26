@@ -18,7 +18,7 @@ export interface IOrderModel extends Document {
   remark?: string
   minAmountOut?: string
   orderHash?: string
-  signedOrder?: { chainId: number, data: string }[]
+  signedOrder?: [{ chainId: number, data: string }]
   orderData?: string
   subOrders?: any
   status?: string

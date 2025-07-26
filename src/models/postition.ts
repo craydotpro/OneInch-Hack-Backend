@@ -1,4 +1,4 @@
-import { model, Schema, Types } from 'mongoose'
+import { model, Schema } from 'mongoose'
 
 const SLTPConfigSchema = new Schema({
   enabled: { type: Boolean, required: true },
@@ -64,7 +64,7 @@ const PositionSchema = new Schema({
     required: false
   },
   orderHash: {
-    type: Types.ObjectId,
+    type: String,
     ref: 'Order',
     required: false
   },
