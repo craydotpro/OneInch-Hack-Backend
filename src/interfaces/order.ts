@@ -1,8 +1,6 @@
-import { Types } from 'mongoose'
 import { Hex } from 'viem'
 
 export interface IOrder {
-  _id?: Types.ObjectId
   // this is the input of the order
   inputs: IInput[]
   // this is the output of the order
@@ -21,7 +19,6 @@ export interface IOrder {
   metadata: string
   // this is the action that the destination chain should execute
   action: IDestinationAction
-  apiId?: Types.ObjectId
 }
 
 export interface IPayloadPayload {
@@ -46,4 +43,11 @@ export interface IOutput {
 export interface IDestinationAction {
   payload: Hex// Use string for bytes representation
   gasLimit: number | bigint // Use number for gas limit
+}
+
+
+export interface IFullFillCrayOrderInput {
+  order: IOrder;
+  fullfiller: string;
+  outputAmount: string;
 }
