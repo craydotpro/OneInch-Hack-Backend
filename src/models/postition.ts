@@ -21,7 +21,7 @@ const PositionSchema = new Schema({
     enum: PositionType,
     required: true
   },
-  wallet: {
+  userAddress: {
     type: String,
     required: true
   },
