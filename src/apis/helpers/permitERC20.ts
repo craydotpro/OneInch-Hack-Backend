@@ -1,5 +1,6 @@
 import { Hex } from "viem"
-import erc20 from "../../abis/erc20"
+
+import erc20Abi from "../../abis/erc20"
 import { VerifierContractAddresses } from "../../config/contractAddresses"
 import { providers, walletClients } from "../../config/rpcProvider"
 import { getTimestampInSeconds } from "../../utils"
@@ -16,12 +17,12 @@ export const prepareAllowancePermitData = async (params: { tokenAddress: any; ow
   const spenderAddress = VerifierContractAddresses[chainId]
   const erc20Contract = {
     address: tokenAddress,
-    abi: erc20,
+    abi: erc20Abi,
   } as const
 
   const allowance = await provider.readContract({
     address: tokenAddress,
-    abi: erc20,
+    abi: erc20Abi,
     functionName: 'allowance',
     args: [ownerAddress, spenderAddress],
   }) as bigint
