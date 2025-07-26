@@ -34,15 +34,15 @@ export async function createOrder(
       action,
       actionPayload
     } = params
-
+    console.log('action', action)
     destinationToken = getAddress(
       destinationToken ||
         tokenSymbolMap[`${destinationChain}-USDC`].tokenAddress
     )
-    invariant(
-      isValidToken(destinationToken, destinationChain),
-      'Invalid Destination Token'
-    )
+    // invariant(
+    //   isValidToken(destinationToken, destinationChain), //@check eth/BTC addresses
+    //   'Invalid Destination Token'
+    // )
     if (sourceTokens?.length) {
       sourceTokens.forEach((sourceToken) => {
         let srcToken = getAddress(
@@ -69,12 +69,12 @@ export async function createOrder(
       ? encodeFunctionData(actionPayload)
       : '0x'
     let destinationGasLimit =
-      params?.action?.gasLimit ??
+      params?.action?.gasLimit ?
       (await getGasLimit(
         destinationChain,
         receiverAddress as Hex,
         destinationPayload
-      ))
+      )) : undefined
     if (!action?.payload && actionPayload) {
       action = {
         payload: destinationPayload,
@@ -119,7 +119,7 @@ export async function createOrder(
       minAmountOut: minAmount,
       orderHash: orderHashToSign,
       destinationPayload,
-      destinationGasLimit,
+      destinationGasLimit: destinationGasLimit?.toString(),
       orderData: stringifiedOrder,
       apiId: 'crow' // apiId: req.apiObject._id, //@sayli
     })
