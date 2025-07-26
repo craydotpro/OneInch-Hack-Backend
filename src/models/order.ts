@@ -27,7 +27,7 @@ export interface IOrderModel extends Document {
   assignedTo?: string
   assignedAt?: Date
   destinationPayload?: Hex
-  destinationGasLimit?: number
+  destinationGasLimit?: string
   destinationTxHash?: string
   apiId?: string
   currentEvent?: string
