@@ -7,8 +7,7 @@ import { activeChainIds, chains } from "../../config/chainConfig"
 import { IDestinationAction, IInput, IOrder, IOutput } from "../../interfaces/order"
 import { IAccountBalance, ISpendBalance } from "../../interfaces/token"
 import { getTimestampInSeconds } from "../../utils"
-import { r } from "../../utils/redis"
-
+import r from "../../../redis"
 
 const CRAY_ORDR_TYPE_HASH = keccak256(stringToBytes("CrayOrder(Input[] inputs,Output output,address sender,uint256 nonce,uint32 initiateDeadline,uint32 fillDeadline,uint256 settlementExpiry,bytes32 metadata,DestinationAction action)DestinationAction(bytes payload,uint256 gasLimit)Input(uint256 chainId,address token,uint256 amount)Output(uint256 chainId,address token,uint256 minAmountOut,address recipient)"))
 const INPUT_TYPEHASH = keccak256(stringToBytes("Input(uint256 chainId,address token,uint256 amount)"))
