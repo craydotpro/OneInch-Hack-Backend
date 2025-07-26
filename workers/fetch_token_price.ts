@@ -3,7 +3,7 @@ import r from "../redis";
 import { ALLOWED_TOKNS, ENABLED_CHAIND_IDS } from "../constant";
 import execute1InchApi from "../utils/limiter";
 import { _sleep } from "../utils";
-const REFETCH_INTERVAL = 1000 * 20;
+const REFETCH_INTERVAL = 1000 * 60 * 2;
 const fetchTokenPriceByChainId = async (chainId) => {
   return execute1InchApi(async (ONE_INCH_KEY) => {
     const tokenAddresses = Object.values(ALLOWED_TOKNS[chainId]).join(",");
