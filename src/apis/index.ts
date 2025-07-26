@@ -7,6 +7,11 @@ import { Order } from '../models/order';
 import { Position } from '../models/postition';
 import { createOrder, processOrder } from '../services/orderService';
 import { approveAllowance } from './helpers/permitERC20';
+import execute1InchApi from '../../utils/limiter';
+import axios from 'axios';
+import { ENABLED_CHAIND_IDS } from '../../constant';
+import { VerifierContractAddresses } from '../config/contractAddresses';
+import { isValidToken } from '../config/tokens';
 
 
 const router = Router({ mergeParams: true })
@@ -118,5 +123,39 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
   }
 })
 
+router.get('/balance/:walletAddress', async (req: Request, res: Response) => {
+  try {
+    const { walletAddress } = req.params;
+    let balance = await Promise.all(
+      ENABLED_CHAIND_IDS.map(async (chainId) => {
+        let tokens = await execute1InchApi((ONE_INCH_KEY) =>
+          axios.get(
+            `https://api.1inch.dev/balance/v1.2/${chainId}/aggregatedBalancesAndAllowances/${VerifierContractAddresses[chainId] || walletAddress}`,
+            {
+              headers: {
+                Authorization: `Bearer ${ONE_INCH_KEY}`,
+              },
+              params: {
+                wallets: walletAddress,
+                filterEmpty: 'true',
+              },
+            }
+          )
+        );
+        tokens.data.forEach((token) => {
+          token.chainId = chainId;
+        });
+        return tokens.data.filter((token) =>
+          isValidToken(token.address, chainId)
+        );
+      })
+    );
+    balance = balance.flat();
+    res.send(balance);
+  } catch (err) {
+    console.error('[balance]', err);
+    res.status(500).json({ error: 'Failed to fetch balance' });
+  }
+});
 
-export default router
+export default router;

@@ -1,3 +1,4 @@
+import "../constant/env";
 import express from 'express';
 import listEndpoints from 'express-list-endpoints';
 
