@@ -1,6 +1,7 @@
 import { Hex } from "viem"
 
 import erc20Abi from "../../abis/erc20"
+import { chains } from "../../config/chainConfig"
 import { VerifierContractAddresses } from "../../config/contractAddresses"
 import { providers, walletClients } from "../../config/rpcProvider"
 import { getTimestampInSeconds } from "../../utils"
@@ -94,9 +95,10 @@ export const approveAllowance = (
       const hash = await walletClient.writeContract({
         account,
         address: verifyingContract as Hex,
-        abi: erc20,
+        abi: erc20Abi,
         functionName: 'permit',
         args: [walletAddress, VerifierContractAddresses[chainId], value, deadline, v, r, s],
+        chain: chains[chainId],
       })
       await provider.waitForTransactionReceipt({ hash })
     })
