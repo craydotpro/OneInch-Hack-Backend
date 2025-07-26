@@ -1,4 +1,4 @@
-import { IDestinationAction, IPayloadPayload } from "./order"
+import { IDestinationAction, IOrder, IPayloadPayload } from "./order"
 
 export interface IOrderParams {
   senderAddress?: string
@@ -35,4 +35,21 @@ export interface ISignedApprovalData {
   walletAddress: string
   value: number
   deadline: string
+}
+
+
+export interface IProcessOrderParams {
+  orderHash: string
+  order: IOrder
+  userSignature: [{
+    chainId?: number
+    data: string
+  }]
+}
+ 
+export interface ICreateOrder {
+  order: IOrder;
+  solverOutputAmount: string;
+  index: number;
+  userSignature: string;
 }
