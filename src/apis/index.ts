@@ -1,7 +1,9 @@
-import { Request, Response, Router } from 'express'
-import { Position } from '../models/postition'
-import { createOrder } from '../services/orderService'
-import { prepareSmartBuyRoute } from '../services/routingService'
+import { Request, Response, Router } from 'express';
+import { ChainId } from '../config/chains';
+import { getTokenAddress } from '../config/tradeTokens';
+import { Position } from '../models/postition';
+import { createOrder } from '../services/orderService';
+
 
 const router = Router({ mergeParams: true })
 
@@ -26,29 +28,30 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
     // get gasprice
     // get token price
 
-    const route = await prepareSmartBuyRoute(userAddress, toToken, amountInUSD) //return destination details
-    // create and store orderHash
-    const positionParams = {
-      userAddress,
-      toToken,
-      type,
-      amountInUSD,
-      qty: route.estimatedQty,
-      slippage: 0.5,
-      triggerPrice,
-      advanceSLTP,
-      deadline: Math.floor(Date.now() / 1000) + 300
-    }
-
+    // const route = await prepareSmartBuyRoute(userAddress, toToken, amountInUSD) //return destination details
+    // // create and store orderHash
+    const buyingChain = ChainId.BASE_CHAIN_ID
+    const toTokenAddress = getTokenAddress(toToken, buyingChain)
     // save positionParams to database
     // prepare order to sign
     const payParams = {
       senderAddress: userAddress,
       receiverAddress: userAddress,
       amount: amountInUSD, // amount in USD
-      destinationChain: route.destinationChain, // comes from route
-      destinationToken: route.destinationToken, // comes from route
-      orderType: 'p2p', // dapp
+      destinationChain: ChainId.BASE_CHAIN_ID, // comes from route
+      destinationToken: toTokenAddress, // comes from route
+      orderType: 'dapp', // dapp
+    }
+    const positionParams = {
+      userAddress,
+      toToken,
+      type,
+      amountInUSD,
+      // qty: route.estimatedQty,
+      slippage: 0.5,
+      triggerPrice,
+      advanceSLTP,
+      deadline: Math.floor(Date.now() / 1000) + 300
     }
     // Create Order
     const order = await createOrder(payParams) // if destination token is not stable, prep 1inch swap data
@@ -117,32 +120,32 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
 // })
 
 // POST /api/position/submit
-router.post('/submit', async (req: Request, res: Response) => {
-  try {
-    const { signedPayload, signature, swapData, routeInfo } = req.body
+// router.post('/submit', async (req: Request, res: Response) => {
+//   try {
+//     const { signedPayload, signature, swapData, routeInfo } = req.body
 
-    const valid = verifySignature(signedPayload.wallet, signedPayload, signature)
-    if (!valid) {
-      return res.status(400).json({ error: 'Invalid signature' })
-    }
+//     const valid = verifySignature(signedPayload.wallet, signedPayload, signature)
+//     if (!valid) {
+//       return res.status(400).json({ error: 'Invalid signature' })
+//     }
 
-    const position = await Position.create({
-      ...signedPayload,
-      status: 'pending',
-      signature,
-      routeInfo,
-      createdAt: new Date()
-    })
+//     const position = await Position.create({
+//       ...signedPayload,
+//       status: 'pending',
+//       signature,
+//       routeInfo,
+//       createdAt: new Date()
+//     })
 
-    res.json({
-      positionId: position._id,
-      status: position.status
-    })
-  } catch (err) {
-    console.error('[submitPosition]', err)
-    res.status(500).json({ error: 'Failed to submit position' })
-  }
-})
+//     res.json({
+//       positionId: position._id,
+//       status: position.status
+//     })
+//   } catch (err) {
+//     console.error('[submitPosition]', err)
+//     res.status(500).json({ error: 'Failed to submit position' })
+//   }
+// })
 
 
 export default router

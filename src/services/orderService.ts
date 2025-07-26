@@ -34,7 +34,6 @@ export async function createOrder(
       action,
       actionPayload
     } = params
-    console.log('action', action)
     destinationToken = getAddress(
       destinationToken ||
         tokenSymbolMap[`${destinationChain}-USDC`].tokenAddress
