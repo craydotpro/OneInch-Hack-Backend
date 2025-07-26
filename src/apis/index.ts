@@ -1,8 +1,12 @@
 import { Request, Response, Router } from 'express';
 import { ChainId } from '../config/chains';
 import { getTokenAddress } from '../config/tradeTokens';
+import { OrderStatus, ReadableStatus } from '../interfaces/enum';
+import { ISubmitOrderParams } from '../interfaces/orderParams';
+import { Order } from '../models/order';
 import { Position } from '../models/postition';
-import { createOrder } from '../services/orderService';
+import { createOrder, processOrder } from '../services/orderService';
+import { approveAllowance } from './helpers/permitERC20';
 
 
 const router = Router({ mergeParams: true })
@@ -54,12 +58,15 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
       deadline: Math.floor(Date.now() / 1000) + 300
     }
     // Create Order
-    const order = await createOrder(payParams) // if destination token is not stable, prep 1inch swap data
-    const position = await Position.create(positionParams)
+    const { data, message } = await createOrder(payParams) // if destination token is not stable, prep 1inch swap data
+    if (message) {
+      return res.status(500).json({ error: message })
+    }
+    const position = await Position.create({ positionParams, orderHash: data.orderHash })
     // return order data to sign
     res.json({
-      data: order,
-      'message': 'Position prepared successfully',
+      data: { ...data, positionId: position._id },
+      message: 'Position prepared successfully',
     })
   } catch (err) {
     console.error('[preparePosition]', err)
@@ -68,12 +75,42 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
 })
 
 // POST /api/position/submit
-router.post('/submit', async (req: Request, res: Response) => {
+router.post('/submit/:id', async (req: Request, res: Response) => {
   try {
-    const { signedPayload, signature} = req.body
-
-
-    res.json({      message: 'Position submitted successfully',
+    const { id } = req.params
+    const submitOrderParams: ISubmitOrderParams = req.body.params
+    const { signedOrder, signedApprovalData } = submitOrderParams
+    const position = await Position.findById(id)
+    if (!position) {
+      return res.status(404).json({ error: 'Position not found' })
+    }
+    if (signedApprovalData) {
+      await approveAllowance(signedApprovalData)
+    }
+    const updateSignedOrder = await Order.findOneAndUpdate({
+      orderHash: position.orderHash,
+      status: OrderStatus.INITIALIZED,
+    }, {
+      $set: {
+        signedOrder,
+        readableStatus: ReadableStatus.PROCESSING,
+        status: OrderStatus.SIGNED,
+        signedAt: new Date(),
+      }
+    }, {
+      new: true,
+    })
+    if (!updateSignedOrder) {
+      return res.status(404).json({ error: 'Order not found or already processed' })
+    }
+    
+    processOrder({
+      orderHash: position.orderHash,
+      order: JSON.parse(updateSignedOrder.orderData),
+      userSignature: updateSignedOrder.signedOrder
+    })
+    res.json({
+      message: 'Position submitted successfully',
     })
   } catch (err) {
     console.error('[submitPosition]', err)
