@@ -1,9 +1,9 @@
 
 export async function prepareSmartBuyRoute(wallet: string, toToken: string, amount: number) {
   // 1. Fetch user balances across chains
+  //from which chain to buy
   // 2. Compare prices from 1inch Spot Price API
   // 3. Estimate gas and select best chain
-  // 4. Build 1inch swapData
 
   return {
     estimatedQty: 0.0412,
@@ -19,4 +19,11 @@ export async function prepareSmartBuyRoute(wallet: string, toToken: string, amou
       fromChain: 8534
     }
   }
+}
+
+
+export function cheapestToken(tokenName: string) {
+  // get token {chain, tokenAddress} for given tokenName
+  // fetch all token prices from redis 
+  
 }

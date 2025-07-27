@@ -1,5 +1,10 @@
+import axios from 'axios';
 import { Request, Response, Router } from 'express';
+import { ENABLED_CHAIND_IDS } from '../../constant';
+import execute1InchApi from '../../utils/limiter';
 import { ChainId } from '../config/chains';
+import { VerifierContractAddresses } from '../config/contractAddresses';
+import { isValidToken } from '../config/tokens';
 import { getTokenAddress } from '../config/tradeTokens';
 import { OrderStatus, ReadableStatus } from '../interfaces/enum';
 import { ISubmitOrderParams } from '../interfaces/orderParams';
@@ -7,11 +12,6 @@ import { Order } from '../models/order';
 import { Position } from '../models/postition';
 import { createOrder, processOrder } from '../services/orderService';
 import { approveAllowance } from './helpers/permitERC20';
-import execute1InchApi from '../../utils/limiter';
-import axios from 'axios';
-import { ENABLED_CHAIND_IDS } from '../../constant';
-import { VerifierContractAddresses } from '../config/contractAddresses';
-import { isValidToken } from '../config/tokens';
 
 
 const router = Router({ mergeParams: true })
@@ -26,10 +26,10 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
     // buy / (sell- relayer)
     const {
       userAddress,
-      toToken,
+      toToken, // ETH
       type,
       amountInUSD,
-      triggerPrice,
+      triggerPrice, // if limit order
       advanceSLTP
     } = req.body
 
@@ -47,9 +47,15 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
       senderAddress: userAddress,
       receiverAddress: userAddress,
       amount: amountInUSD, // amount in USD
-      destinationChain: ChainId.BASE_CHAIN_ID, // comes from route
+      destinationChain: buyingChain, // comes from route
       destinationToken: toTokenAddress, // comes from route
       orderType: 'dapp', // dapp
+    }
+    
+    // Create Order
+    const { data, message } = await createOrder(payParams) // if destination token is not stable, prep 1inch swap data
+    if (message) {
+      return res.status(500).json({ error: message })
     }
     const positionParams = {
       userAddress,
@@ -60,14 +66,10 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
       slippage: 0.5,
       triggerPrice,
       advanceSLTP,
-      deadline: Math.floor(Date.now() / 1000) + 300
+      deadline: Math.floor(Date.now() / 1000) + 300,
+      orderHash: data.orderHash
     }
-    // Create Order
-    const { data, message } = await createOrder(payParams) // if destination token is not stable, prep 1inch swap data
-    if (message) {
-      return res.status(500).json({ error: message })
-    }
-    const position = await Position.create({ positionParams, orderHash: data.orderHash })
+    const position = await Position.create({ positionParams })
     // return order data to sign
     res.json({
       data: { ...data, positionId: position._id },
