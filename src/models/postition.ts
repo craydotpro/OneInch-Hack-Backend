@@ -31,11 +31,11 @@ const PositionSchema = new Schema({
     required: true
   },
   amountInUSD: {
-    type: Number,
+    type: String,
     required: true
   },
   qty: {
-    type: Number,
+    type: String,
     required: false
   },
   avgPrice: {

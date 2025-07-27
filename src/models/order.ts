@@ -58,11 +58,11 @@ const OrderBreakdownSchema = new Schema(
       required: true,
     },
     gasUsed: {
-      type: Number,
+      type: String,
       required: true,
     },
     gasPrice: {
-      type: Number,
+      type: String,
     }
   },
   { _id: false }

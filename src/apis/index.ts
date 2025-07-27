@@ -51,7 +51,6 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
       destinationToken: toTokenAddress, // comes from route
       orderType: 'dapp', // dapp
     }
-    
     // Create Order
     const { data, message } = await createOrder(payParams) // if destination token is not stable, prep 1inch swap data
     if (message) {
@@ -69,10 +68,10 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
       deadline: Math.floor(Date.now() / 1000) + 300,
       orderHash: data.orderHash
     }
-    const position = await Position.create({ positionParams })
+    const position = await Position.create(positionParams)
     // return order data to sign
     res.json({
-      data: { ...data, positionId: position._id },
+      result: {...data, positionId: position._id },
       message: 'Position prepared successfully',
     })
   } catch (err) {
@@ -85,7 +84,7 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
 router.post('/submit/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const submitOrderParams: ISubmitOrderParams = req.body.params
+    const submitOrderParams: ISubmitOrderParams = req.body
     const { signedOrder, signedApprovalData } = submitOrderParams
     const position = await Position.findById(id)
     if (!position) {
@@ -94,12 +93,17 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
     if (signedApprovalData) {
       await approveAllowance(signedApprovalData)
     }
+    const sii = [{
+      chainId: ChainId.BASE_CHAIN_ID,
+      data: signedOrder
+    }]
+
     const updateSignedOrder = await Order.findOneAndUpdate({
       orderHash: position.orderHash,
       status: OrderStatus.INITIALIZED,
     }, {
       $set: {
-        signedOrder,
+        signedOrder: sii,
         readableStatus: ReadableStatus.PROCESSING,
         status: OrderStatus.SIGNED,
         signedAt: new Date(),
