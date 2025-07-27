@@ -10,6 +10,7 @@ import { isValidToken, tokenSymbolMap } from '../config/tokens'
 import { getBalance } from '../apis/helpers/balance'
 import { prepareOrder } from '../apis/helpers/order'
 import { prepareAllowancePermitData } from '../apis/helpers/permitERC20'
+import { generateSwapData } from '../apis/helpers/swap'
 import { fullfillOrder, getGasLimit, getOwnerSignOnOrder, submitOrder } from '../apis/helpers/web3'
 import { OrderStatus, ReadableStatus } from '../interfaces/enum'
 import { IOrderParams, IProcessOrderParams } from '../interfaces/orderParams'
@@ -196,14 +197,24 @@ export async function processOrder(orderParams: IProcessOrderParams) {
     const sourceChainSuccessfull = sourceChainOrders.length && sourceChainOrders.every(order => order.txStatus);
     // TODO: check if order exists on source chain, funds are locked and order is valid and then only create sign
     if (sourceChainSuccessfull) {
+      let swapData;
       console.debug('All source chain suborders successfull:', orderParams.orderHash);
       const craySig = await getOwnerSignOnOrder(orderParams.orderHash, orderParams.order.output.chainId);
-      const oneInchCalldata = "0x07ed23790000000000000000000000006ea77f83ec8693666866ece250411c974ab962a8000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000fde4c96c8593536e31f229ea8f37b2ada2699bb20000000000000000000000006ea77f83ec8693666866ece250411c974ab962a800000000000000000000000087146d9c3230cf0fce7ae16a7140522f313bafcd00000000000000000000000000000000000000000000000000000000000f424000000000000000000000000000000000000000000000000000000000000f171b00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000015c00000000000000000000000000000000000000000000000000013e00004e00a0744c8c09833589fcd6edb6e08f4c7c32d4f71b54bda0291390cbe4bdd538d6e9b379bff5fe72c3d67a521de500000000000000000000000000000000000000000000000000000000000003e851329ab7730b09ebd9ff2df70f06339bd289a1680a46833589fcd6edb6e08f4c7c32d4f71b54bda02913004475d39ecb000000000000000000000000111111125421ca6dc452d289314280a0f8842a650000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000276a400000000000000000000000000000000000000000000000000000000000f171b00000000000000000000000000000000000000000000000000000000688736a600000000651e9670"
-      const oneInch = "0x111111125421ca6dc452d289314280a0f8842a65"
+      // todo: if orderParams.order.output.token is not from tokenList then prepare swapParams
+      const isStable = isValidToken(orderParams.order.output.token, orderParams.order.output.chainId)
+      if (!isStable) {
+        swapData = await generateSwapData({
+          chainId: orderParams.order.output.chainId,
+          amount: orderParams.order.output.minAmountOut,
+          toToken: orderParams.order.output.token,
+          receiver: orderParams.order.output.recipient,
+          usdc: tokenSymbolMap[`${orderParams.order.output.chainId}-USDC`].tokenAddress
+        })
+      }
       const swapParams = {
         makerAsset: orderParams.order.output.token,
-        swapContract: oneInch,
-        swapData: oneInchCalldata
+        swapContract: swapData.to,
+        swapData: swapData.calldata,
       }
       const fulfilledOndestination = await fullfillOrder(orderParams.order.output.chainId, {
         order: orderParams.order,
