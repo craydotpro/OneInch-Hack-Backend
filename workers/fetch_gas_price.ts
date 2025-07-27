@@ -6,7 +6,7 @@ import { _sleep } from "../utils";
 const REFETCH_INTERVAL = 1000 * 60 * 2;
 const fetchGasByChainId = async (chainId) => {
   let gas = await execute1InchApi((ONE_INCH_KEY) =>
-    axios.get("https://api.1inch.dev/gas-price/v1.6/1", {
+    axios.get(`https://api.1inch.dev/gas-price/v1.6/${chainId}`, {
       headers: {
         Authorization: `Bearer ${ONE_INCH_KEY}`,
       },
