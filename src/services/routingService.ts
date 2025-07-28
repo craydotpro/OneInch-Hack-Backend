@@ -21,9 +21,3 @@ export async function prepareSmartBuyRoute(wallet: string, toToken: string, amou
   }
 }
 
-
-export function cheapestToken(tokenName: string) {
-  // get token {chain, tokenAddress} for given tokenName
-  // fetch all token prices from redis 
-  
-}
