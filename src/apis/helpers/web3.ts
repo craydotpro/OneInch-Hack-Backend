@@ -48,8 +48,8 @@ export async function fullfillOrder(chainId: number, input: IFullFillCrayOrderIn
   return provider.waitForTransactionReceipt({ hash })
 }
 
-export function getOwnerSignOnOrder(orderHash: string, chainId: number) {
+export function getOwnerSignOnOrder(orderHash: string, solverAddress: string, chainId: number) {
   const account = getOwnerAccountByChainId(chainId);
-  const message = hashFullfillOrder({ orderHash, solverAddress: account.address });
+  const message = hashFullfillOrder({ orderHash, solverAddress });
   return account.signMessage({ message: { raw: message as Hex } })
 }

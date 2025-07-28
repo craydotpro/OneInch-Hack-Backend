@@ -199,7 +199,8 @@ export async function processOrder(orderParams: IProcessOrderParams) {
     if (sourceChainSuccessfull) {
       let swapData;
       console.debug('All source chain suborders successfull:', orderParams.orderHash);
-      const craySig = await getOwnerSignOnOrder(orderParams.orderHash, orderParams.order.output.chainId);
+      const solverAddress = getSolverAccountByChainId(orderParams.order.output.chainId).address
+      const craySig = await getOwnerSignOnOrder(orderParams.orderHash, solverAddress, orderParams.order.output.chainId);
       // todo: if orderParams.order.output.token is not from tokenList then prepare swapParams
       const isStable = isValidToken(orderParams.order.output.token, orderParams.order.output.chainId)
       if (!isStable) {
@@ -211,14 +212,19 @@ export async function processOrder(orderParams: IProcessOrderParams) {
           usdc: tokenSymbolMap[`${orderParams.order.output.chainId}-USDC`].tokenAddress
         })
       }
+      if (!swapData) {
+        console.error(`Swap data not prepared for order ${orderParams.orderHash}`);
+        await Order.updateOne({ orderHash: orderParams.orderHash }, { orderState: OrderStatus.CREATED_FAILED });
+        return;
+      }
       const swapParams = {
-        makerAsset: orderParams.order.output.token,
+        makerAsset: tokenSymbolMap[`${orderParams.order.output.chainId}-USDC`].tokenAddress,
         swapContract: swapData.to,
         swapData: swapData.calldata,
       }
       const fulfilledOndestination = await fullfillOrder(orderParams.order.output.chainId, {
         order: orderParams.order,
-        fullfiller: getSolverAccountByChainId(orderParams.order.output.chainId).address!,
+        fullfiller: solverAddress,
         outputAmount: orderParams.order.output.minAmountOut
       }, craySig, swapParams, orderParams.orderHash);
       // const fulfilledOndestination = await fulfilledOndestinationTx.wait();
@@ -227,7 +233,7 @@ export async function processOrder(orderParams: IProcessOrderParams) {
           chainId: orderParams.order.output.chainId,
           txHash: fulfilledOndestination.transactionHash,
           txStatus: fulfilledOndestination.status,
-          fulfiller: getSolverAccountByChainId(orderParams.order.output.chainId).address!,
+          fulfiller: solverAddress,
           gasUsed: fulfilledOndestination.gasUsed,
           type: SubOrderType.OUTPUT,
         }
