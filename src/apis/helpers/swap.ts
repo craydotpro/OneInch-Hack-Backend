@@ -1,9 +1,8 @@
 import axios from "axios";
+import execute1InchApi from "../../../utils/limiter";
 import { FusionAddresses } from "../../config/contractAddresses";
 const API_URL = `https://api.1inch.dev/swap/v6.1/`;
-const headers = {
-  Authorization: '', // Replace with your API key
-};
+
 export async function generateSwapData({chainId, usdc,amount, toToken, receiver}) {
   try {
     const params = {
@@ -17,7 +16,10 @@ export async function generateSwapData({chainId, usdc,amount, toToken, receiver}
     };
     // await approveToken(); // Ensure token approval is done first
     console.log('Generating calldata for swap...');
-    const response = await axios.get(API_URL + chainId + '/swap', { headers, params });
+    const response = await execute1InchApi((ONE_INCH_KEY) => axios.get(API_URL + chainId + '/swap', {
+      headers: {
+        Authorization: `Bearer ${ONE_INCH_KEY}`,
+      }, params }));
     console.log('Calldata:', response.data.tx.data);
     console.log('To (target contract):', response.data.tx.to);
     console.log('Value:', response.data.tx.value);
