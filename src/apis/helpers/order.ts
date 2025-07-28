@@ -3,11 +3,11 @@ import { encodeAbiParameters, formatUnits, Hex, keccak256, pad, parseUnits, stri
 import { arbitrum, arbitrumSepolia, base, baseSepolia, optimism, optimismSepolia, polygon, polygonAmoy } from "viem/chains"
 
 
+import r from "../../../redis"
 import { activeChainIds, chains } from "../../config/chainConfig"
 import { IDestinationAction, IInput, IOrder, IOutput } from "../../interfaces/order"
 import { IAccountBalance, ISpendBalance } from "../../interfaces/token"
 import { getTimestampInSeconds } from "../../utils"
-import r from "../../../redis"
 
 const CRAY_ORDR_TYPE_HASH = keccak256(stringToBytes("CrayOrder(Input[] inputs,Output output,address sender,uint256 nonce,uint32 initiateDeadline,uint32 fillDeadline,uint256 settlementExpiry,bytes32 metadata,DestinationAction action)DestinationAction(bytes payload,uint256 gasLimit)Input(uint256 chainId,address token,uint256 amount)Output(uint256 chainId,address token,uint256 minAmountOut,address recipient)"))
 const INPUT_TYPEHASH = keccak256(stringToBytes("Input(uint256 chainId,address token,uint256 amount)"))
@@ -127,8 +127,8 @@ export const allocationOrder = async (): Promise<number[]> => {
     [optimism.id]: 273015,//op
     [arbitrum.id]: 542240,//arb
   }
-  const coinPrice = await r.HGETALL('coin_price')
-  const gasPrice = await r.HGETALL('gas_price')
+  const coinPrice = await r.hgetall('coin_price')
+  const gasPrice = await r.hgetall('gas_price')
   /** calculated expected spending gas for evey chains */
   let expectedGas = Object.keys(gas).reduce((obj, chainId) => {
     if (!activeChainIds.has(chainId)) return obj
