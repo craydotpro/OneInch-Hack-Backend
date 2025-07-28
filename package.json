@@ -7,7 +7,8 @@
     "start": "node dist/app.js",
     "dev": "concurrently 'nodemon src/app.ts' 'nodemon workers/index.ts'",
     "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "yo": "nodemon src/test.ts"
   },
   "author": "sayli <ptsayli@gmail.com>",
   "license": "MIT",
