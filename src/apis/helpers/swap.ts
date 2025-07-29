@@ -1,4 +1,7 @@
+import { Address, LimitOrder, MakerTraits } from "@1inch/limit-order-sdk";
 import axios from "axios";
+
+
 import execute1InchApi from "../../../utils/limiter";
 import { FusionAddresses } from "../../config/contractAddresses";
 const API_URL = `https://api.1inch.dev/swap/v6.1/`;
@@ -31,4 +34,23 @@ export async function generateSwapData({chainId, usdc,amount, toToken, receiver}
   } catch (error) {
     console.error('Error generating calldata:', error);
   }
+}
+
+export async function prepareLimitOrder({ chainId, maker, makerAsset, takerAsset, makingAmount, takingAmount }) {
+  const expiresIn = BigInt(12000) // 2m
+  const expiration = BigInt(Math.floor(Date.now() / 1000)) + expiresIn
+
+  // see MakerTraits.ts
+  const makerTraits = MakerTraits.default().withExpiration(expiration)
+  const order = new LimitOrder({
+    makerAsset: new Address(makerAsset),
+    takerAsset: new Address(takerAsset),
+    makingAmount: makingAmount,
+    takingAmount: takingAmount,
+    maker: new Address(maker),
+    // salt? : bigint
+    // receiver? : Address
+  }, makerTraits)
+  const typedData = order.getTypedData(chainId)
+  return typedData
 }

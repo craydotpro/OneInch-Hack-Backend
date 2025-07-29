@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { Request, Response, Router } from 'express';
+import { parseUnits } from 'viem';
 import { ENABLED_CHAIND_IDS } from '../../constant';
 import execute1InchApi from '../../utils/limiter';
 import { ChainId } from '../config/chains';
@@ -14,6 +15,7 @@ import { Position } from '../models/postition';
 import { createOrder, processOrder } from '../services/orderService';
 import { approveAllowance } from './helpers/permitERC20';
 import { prepareSLTPPosition } from './helpers/sltp';
+import { prepareLimitOrder } from './helpers/swap';
 
 
 const router = Router({ mergeParams: true })
@@ -29,7 +31,7 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
     const {
       userAddress,
       toToken, // ETH
-      type,
+      type, //market/limit
       amountInUSD,
       triggerPrice, // if limit order
       advanceSLTP
@@ -41,10 +43,9 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
 
     // const route = await prepareSmartBuyRoute(userAddress, toToken, amountInUSD) //return destination details
     // // create and store orderHash
+    let limitOrderData
     const buyingChain = ChainId.BASE_CHAIN_ID
     const toTokenAddress = getTokenAddress(toToken, buyingChain)
-    // save positionParams to database
-    // prepare order to sign
     const payParams = {
       senderAddress: userAddress,
       receiverAddress: userAddress,
@@ -53,6 +54,29 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
       destinationToken: toTokenAddress, // comes from route
       orderType: 'dapp', // dapp
     }
+    if (type === 'limit') {
+      // payParams with receiver address with USDC on buyingChain
+      payParams.destinationToken = tokenSymbolMap[`${buyingChain}-USDC`].tokenAddress
+      // Calculate the number of tokens to buy for the given USD amount and trigger price.
+      // Example: amountInUSD = 100, triggerPrice = 1.2 => tokens = 100 / 1.2 = 83.333...
+      // For tokens with 18 decimals:
+
+      const typedData = await prepareLimitOrder({
+        chainId: buyingChain,
+        maker: userAddress,
+        makerAsset: tokenSymbolMap[`${buyingChain}-USDC`].tokenAddress,
+        takerAsset: toTokenAddress,
+        makingAmount: parseUnits(amountInUSD.toString(), 6), // assuming USDC has 6 decimals
+        takingAmount: parseUnits((amountInUSD / triggerPrice).toString(), 18)
+      })
+      console.log('Prepared Limit Order:', typedData)
+      limitOrderData = {
+        domain: typedData.domain,
+        types: { Order: typedData.types.Order },
+        message: typedData.message,
+      }
+    }
+    
     // Create Order
     const { data, message } = await createOrder(payParams) // if destination token is not stable, prep 1inch swap data
     if (message) {
@@ -68,12 +92,13 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
       triggerPrice,
       advanceSLTP,
       deadline: Math.floor(Date.now() / 1000) + 300,
-      orderHash: data.orderHash
+      orderHash: data.orderHash,
+      positionData: JSON.stringify(limitOrderData)
     }
     const position = await Position.create(positionParams)
     // return order data to sign
     res.json({
-      result: {...data, positionId: position._id },
+      result: { ...data, limitOrderData, positionId: position._id },
       message: 'Position prepared successfully',
     })
   } catch (err) {

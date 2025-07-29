@@ -50,6 +50,14 @@ const PositionSchema = new Schema({
     type: Number,
     required: false
   },
+  positionData: {
+    type: String,
+    required: false
+  },
+  signature: {
+    type: String,
+    required: false
+  },
   advanceSLTP: {
     type: AdvanceSLTPSchema,
     required: false
