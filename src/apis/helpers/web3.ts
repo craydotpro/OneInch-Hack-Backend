@@ -53,3 +53,19 @@ export function getOwnerSignOnOrder(orderHash: string, solverAddress: string, ch
   const message = hashFullfillOrder({ orderHash, solverAddress });
   return account.signMessage({ message: { raw: message as Hex } })
 }
+
+export async function executeSLTPPositions(chainId: number, position: any, signature: string) {
+  console.log(`Executing SLTP position on chain ${chainId}`, position);
+  const provider = providers[chainId];
+  const walletClient = walletClients[chainId];
+  const account = getSolverAccountByChainId(chainId);
+  const hash = await walletClient.writeContract({
+    account,
+    address: FusionAddresses[chainId] as Hex,
+    abi: fusionAbi,
+    functionName: 'executeAdvancePositions',
+    args: [position, signature],
+    chain: chains[chainId],
+  })
+  return provider.waitForTransactionReceipt({ hash })
+}
