@@ -4,14 +4,16 @@ import { ENABLED_CHAIND_IDS } from '../../constant';
 import execute1InchApi from '../../utils/limiter';
 import { ChainId } from '../config/chains';
 import { VerifierContractAddresses } from '../config/contractAddresses';
-import { isValidToken } from '../config/tokens';
+import { isValidToken, tokenSymbolMap } from '../config/tokens';
 import { getTokenAddress } from '../config/tradeTokens';
 import { OrderStatus, ReadableStatus } from '../interfaces/enum';
 import { ISubmitOrderParams } from '../interfaces/orderParams';
+import { AdvanceSLTP } from '../models/advancePositions';
 import { Order } from '../models/order';
 import { Position } from '../models/postition';
 import { createOrder, processOrder } from '../services/orderService';
 import { approveAllowance } from './helpers/permitERC20';
+import { prepareSLTPPosition } from './helpers/sltp';
 
 
 const router = Router({ mergeParams: true })
@@ -126,6 +128,70 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('[submitPosition]', err)
     res.status(500).json({ error: 'Failed to submit position' })
+  }
+})
+
+// POST set advance SLTP
+router.post('/sltp/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const { type, triggerPrice } = req.body
+  
+    const position = await Position.findById(id)
+    if (!position) {
+      return res.status(404).json({ error: 'Position not found' })
+    }
+    
+    // Check if advanceSLTP already exists
+    // prepare data to sign
+    const preparePosition = {
+      maker: position.userAddress,
+      makerAsset: getTokenAddress(position.toToken, ChainId.BASE_CHAIN_ID),
+      makerAmount: position.amountInUSD,
+      takerAsset:  tokenSymbolMap[`${ChainId.BASE_CHAIN_ID}-USDC`].tokenAddress,
+      triggerPrice,
+      deadline: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+      isStopLoss: type === 'sl',
+    }
+    // const signature = await signSLTPPosition(getSolverAccountByChainId(ChainId.BASE_CHAIN_ID), preparePosition)
+    const advanceSLTP = prepareSLTPPosition(preparePosition)
+    await AdvanceSLTP.create({
+      positionId: position._id,
+      type,
+      positionData: JSON.stringify(advanceSLTP),
+    })
+
+    res.json({
+      message: 'Please sign the SL/TP position',
+      result: { positionId: position._id, data: advanceSLTP },
+    })
+  } catch (err) {
+    console.error('submitPosition', err)
+    res.status(500).json({ error: 'Failed to submit position' })
+  }
+})
+
+router.post('/sltp/submit/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const { signedPosition } = req.body
+    const advanceSLTP = await AdvanceSLTP.findById(id)
+    if (!advanceSLTP) {
+      return res.status(404).json({ error: 'Advance SL/TP not found' });
+    }
+    if (!signedPosition) {
+      return res.status(400).json({ error: 'Signed position data is required' });
+    }
+    // Update the advance SL/TP with the signed position
+    advanceSLTP.signedPosition = signedPosition;
+    advanceSLTP.status = 'active'; // Set status to active
+    await advanceSLTP.save();
+    res.json({
+      message: 'SL/TP set successfully',
+    })
+  } catch (err) {
+    console.error('submitSLTPPosition', err);
+    return res.status(500).json({ error: 'Failed to submit SL/TP position' });
   }
 })
 

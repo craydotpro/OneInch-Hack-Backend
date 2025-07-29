@@ -27,7 +27,7 @@ const PositionSchema = new Schema({
   },
   toToken: {
     type: String,
-    enum: ['ETH', 'BTC', 'POL'],
+    enum: ['ETH', 'WBTC'],
     required: true
   },
   amountInUSD: {
