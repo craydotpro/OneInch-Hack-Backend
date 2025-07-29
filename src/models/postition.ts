@@ -54,10 +54,16 @@ const PositionSchema = new Schema({
     type: String,
     required: false
   },
-  signature: {
-    type: String,
-    required: false
-  },
+  signedLimitOrder: [{
+    chainId: {
+      type: Number,
+      required: false,
+    },
+    data: {
+      type: String,
+      required: true,
+    }
+  }],
   advanceSLTP: {
     type: AdvanceSLTPSchema,
     required: false

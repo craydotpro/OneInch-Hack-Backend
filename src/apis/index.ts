@@ -15,7 +15,7 @@ import { Position } from '../models/postition';
 import { createOrder, processOrder } from '../services/orderService';
 import { approveAllowance } from './helpers/permitERC20';
 import { prepareSLTPPosition } from './helpers/sltp';
-import { prepareLimitOrder } from './helpers/swap';
+import { prepareLimitOrder, submitLimitOrder } from './helpers/swap';
 
 
 const router = Router({ mergeParams: true })
@@ -44,6 +44,7 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
     // const route = await prepareSmartBuyRoute(userAddress, toToken, amountInUSD) //return destination details
     // // create and store orderHash
     let limitOrderData
+    let stringifiedLimitOrderData
     const buyingChain = ChainId.BASE_CHAIN_ID
     const toTokenAddress = getTokenAddress(toToken, buyingChain)
     const payParams = {
@@ -61,7 +62,7 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
       // Example: amountInUSD = 100, triggerPrice = 1.2 => tokens = 100 / 1.2 = 83.333...
       // For tokens with 18 decimals:
 
-      const typedData = await prepareLimitOrder({
+      const {typedData, order} = await prepareLimitOrder({
         chainId: buyingChain,
         maker: userAddress,
         makerAsset: tokenSymbolMap[`${buyingChain}-USDC`].tokenAddress,
@@ -70,6 +71,9 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
         takingAmount: parseUnits((amountInUSD / triggerPrice).toString(), 18)
       })
       console.log('Prepared Limit Order:', typedData)
+      stringifiedLimitOrderData = JSON.stringify(typedData.message, (_, v) =>
+        typeof v === 'bigint' ? v.toString() : v
+      )
       limitOrderData = {
         domain: typedData.domain,
         types: { Order: typedData.types.Order },
@@ -93,7 +97,7 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
       advanceSLTP,
       deadline: Math.floor(Date.now() / 1000) + 300,
       orderHash: data.orderHash,
-      positionData: JSON.stringify(limitOrderData)
+      positionData: stringifiedLimitOrderData
     }
     const position = await Position.create(positionParams)
     // return order data to sign
@@ -112,7 +116,7 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params
     const submitOrderParams: ISubmitOrderParams = req.body
-    const { signedOrder, signedApprovalData } = submitOrderParams
+    const { signedOrder, signedApprovalData, signedLimitOrderData } = submitOrderParams
     const position = await Position.findById(id)
     if (!position) {
       return res.status(404).json({ error: 'Position not found' })
@@ -124,7 +128,7 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
       chainId: ChainId.BASE_CHAIN_ID,
       data: signedOrder
     }]
-
+   
     const updateSignedOrder = await Order.findOneAndUpdate({
       orderHash: position.orderHash,
       status: OrderStatus.INITIALIZED,
@@ -142,11 +146,25 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Order not found or already processed' })
     }
     
-    processOrder({
+    await processOrder({
       orderHash: position.orderHash,
       order: JSON.parse(updateSignedOrder.orderData),
       userSignature: updateSignedOrder.signedOrder
     })
+    // wait for receipt as well
+    if (signedLimitOrderData) {
+      const updatePosition = await Position.findByIdAndUpdate(id, {
+        $set: {
+          signedLimitOrder: [{ chainId: ChainId.BASE_CHAIN_ID, data: signedLimitOrderData }],
+        }
+      })
+      // call 1inch submit api
+      await submitLimitOrder({
+        chainId: ChainId.BASE_CHAIN_ID,
+        order: updatePosition.positionData,
+        signedOrder: signedLimitOrderData
+      })
+    }
     res.json({
       message: 'Position submitted successfully',
     })

@@ -1,12 +1,10 @@
 import { Address, LimitOrder, MakerTraits } from "@1inch/limit-order-sdk";
 import axios from "axios";
-
-
 import execute1InchApi from "../../../utils/limiter";
 import { FusionAddresses } from "../../config/contractAddresses";
 const API_URL = `https://api.1inch.dev/swap/v6.1/`;
 
-export async function generateSwapData({chainId, usdc,amount, toToken, receiver}) {
+export async function generateSwapData({ chainId, usdc, amount, toToken, receiver }) {
   try {
     const params = {
       from: FusionAddresses[chainId], // Gateway
@@ -22,7 +20,8 @@ export async function generateSwapData({chainId, usdc,amount, toToken, receiver}
     const response = await execute1InchApi((ONE_INCH_KEY) => axios.get(API_URL + chainId + '/swap', {
       headers: {
         Authorization: `Bearer ${ONE_INCH_KEY}`,
-      }, params }));
+      }, params
+    }));
     console.log('Calldata:', response.data.tx.data);
     console.log('To (target contract):', response.data.tx.to);
     console.log('Value:', response.data.tx.value);
@@ -52,5 +51,31 @@ export async function prepareLimitOrder({ chainId, maker, makerAsset, takerAsset
     // receiver? : Address
   }, makerTraits)
   const typedData = order.getTypedData(chainId)
-  return typedData
+  return { order, typedData }
+}
+
+export async function submitLimitOrder({ chainId, order, signedOrder }) {
+  try {
+    // const api = new Api({
+    // networkId: chainId,
+    //   authKey: process.env.ONE_INCH_KEY,
+    //   httpConnector: new FetchProviderConnector()
+    // });
+    // await api.submitOrder(order, signedOrder);
+
+    const API_URL = `https://api.1inch.dev/orderbook/v4.0/`
+    const response = await execute1InchApi((ONE_INCH_KEY) => axios.post(API_URL + chainId, {
+      orderHash: order.getOrderHash(chainId),
+      signature: signedOrder,
+      data: { ...order, ...order.build(), extension: order.extension.encode() }
+    }, {
+      headers: {
+        Authorization: `Bearer ${ONE_INCH_KEY}`,
+      }
+    }))
+    console.log('Limit order submitted successfully');
+    return response.data;
+  } catch (error) {
+    console.error('Error submitting limit order:', error);
+  }
 }
