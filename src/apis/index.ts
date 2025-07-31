@@ -15,7 +15,8 @@ import { Position, PositionStatus, PositionType } from '../models/postition';
 import { createOrder, processOrder } from '../services/orderService';
 import { approveAllowance } from './helpers/permitERC20';
 import { prepareSLTPPosition } from './helpers/sltp';
-import { prepareLimitOrder, submitLimitOrder } from './helpers/swap';
+import { generateSwapData, prepareLimitOrder, sellPosition, submitLimitOrder } from './helpers/swap';
+import { executeSLTPPositions } from './helpers/web3';
 
 const router = Router({ mergeParams: true });
 
@@ -88,6 +89,7 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
       slippage: 0.5,
       triggerPrice,
       advanceSLTP,
+      sellingChain: buyingChain,
       deadline: Math.floor(Date.now() / 1000) + 300,
       orderHash: data.orderHash,
       limitOrderHash,
@@ -105,12 +107,59 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
   }
 });
 
+router.post('/prepare-sell', async (req: Request, res: Response) => {
+  try {
+    const {
+      userAddress,
+      sellingToken, // ETH
+      sellingChain = ChainId.BASE_CHAIN_ID, // BASE
+      type, //market/limit
+      amountInTokens,
+      triggerPrice, // if limit order
+      advanceSLTP,
+    } = req.body;
+    const sellingTokenAddress = getTokenAddress(sellingToken, sellingChain);
+    const usdc = tokenSymbolMap[`${sellingChain}-USDC`].tokenAddress
+    const sellTypedData = await sellPosition({
+      chainId: sellingChain,
+      srcToken: sellingTokenAddress,
+      amount: amountInTokens,
+      toToken: usdc,
+      user: userAddress,
+    })
+    const positionParams = {
+      userAddress,
+      toToken: usdc,
+      type,
+      // amountInUSD , // @todo: calculate amount in USD
+      qty: amountInTokens,
+      executeOnChain: sellingChain,
+      slippage: 0.5,
+      triggerPrice,
+      advanceSLTP,
+      deadline: Math.floor(Date.now() / 1000) + 3600,
+      sellPositionTypedData: JSON.stringify(sellTypedData),
+      // limitOrderHash,
+      // limitOrderData: JSON.stringify(limitOrderData),
+      // limitOrderTypedData: JSON.stringify(limitOrderTypedData),
+    };
+    const position = await Position.create(positionParams);
+    return res.json({
+      result: { positionId: position._id, sellTypedData },
+      message: 'Sell Position prepared, Please Sign the position',
+    });
+  } catch (err) {
+    console.error('[prepare sell Position]', err);
+    res.status(500).json({ error: 'Failed to sell position' });
+  }
+});
+
 // POST /api/position/submit
 router.post('/submit/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const submitOrderParams: ISubmitOrderParams = req.body;
-    const { signedOrder, signedApprovalData, signedLimitOrder } =
+    const { signedOrder, signedApprovalData, signedLimitOrder, signedSellPosition } =
       submitOrderParams;
     const position = await Position.findById(id);
     let order;
@@ -120,6 +169,37 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
     }
     if (signedApprovalData) {
       await approveAllowance(signedApprovalData);
+    }
+    if (signedSellPosition && signedSellPosition.length) {
+      await Position.findByIdAndUpdate(
+        id,
+        {
+          $set: {
+            signedSellPosition,
+          },
+        },
+        {
+          new: true,
+        }
+      );
+      const swapData = await generateSwapData({
+        chainId: position.executeOnChain,
+        from: position.userAddress,
+        srcToken: position.fromTokenAddress,
+        toToken: position.toTokenAddress,
+        amount: position.qty,
+        receiver: position.userAddress,
+      });
+      const p = position.sellPositionTypedData ? JSON.parse(position.sellPositionTypedData) : {};
+      console.log('ppppp', p);
+      const pp = p.message
+      const preparePosition = {
+        ...pp,
+        swapContract: swapData.to,
+        swapData: swapData.calldata,
+      }
+      const txHash = await executeSLTPPositions(position.executeOnChain, preparePosition, signedSellPosition[0].data);
+      positionStatus = txHash?.status ? PositionStatus.EXECUTED : PositionStatus.FAILED;
     }
     if (signedOrder && signedOrder.length) {
       const updateSignedOrder = await Order.findOneAndUpdate(
@@ -178,7 +258,7 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
       );
       // call 1inch submit api
       const orderInfo = await submitLimitOrder({
-        chainId: ChainId.BASE_CHAIN_ID,
+        chainId: position.executeOnChain,
         orderHash: updatePosition.limitOrderHash,
         order: JSON.parse(updatePosition.limitOrderData),
         signedOrder: signedLimitOrder,
@@ -223,9 +303,9 @@ router.post('/sltp/:id', async (req: Request, res: Response) => {
     // prepare data to sign
     const preparePosition = {
       maker: position.userAddress,
-      makerAsset: getTokenAddress(position.toToken, ChainId.BASE_CHAIN_ID),
+      makerAsset: getTokenAddress(position.toToken, position.executeOnChain),
       makerAmount: position.amountInUSD,
-      takerAsset: tokenSymbolMap[`${ChainId.BASE_CHAIN_ID}-USDC`].tokenAddress,
+      takerAsset: tokenSymbolMap[`${position.executeOnChain}-USDC`].tokenAddress,
       triggerPrice,
       deadline: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
       isStopLoss: type === 'sl',

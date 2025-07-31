@@ -7,11 +7,12 @@ import {
   Sdk,
 } from '@1inch/limit-order-sdk';
 import execute1InchApi from '../../../utils/limiter';
-import { FusionAddresses } from '../../config/contractAddresses';
+import { prepareSLTPPosition } from './sltp';
 
 export async function generateSwapData({
   chainId,
-  usdc,
+  from,
+  srcToken,
   amount,
   toToken,
   receiver,
@@ -19,8 +20,8 @@ export async function generateSwapData({
   const API_URL = `https://api.1inch.dev/swap/v6.1/`;
   try {
     const params = {
-      from: FusionAddresses[chainId], // Gateway
-      src: usdc, // always USDC
+      from,
+      src: srcToken,
       dst: toToken,
       amount: amount,
       receiver: receiver,
@@ -44,6 +45,32 @@ export async function generateSwapData({
     };
   } catch (error) {
     console.error('Error generating calldata:', error);
+  }
+}
+
+export async function sellPosition({
+  chainId,
+  srcToken,
+  amount,
+  toToken,
+  user,
+}) {
+  try {
+  
+    const preparePosition = {
+      maker: user,
+      makerAsset: srcToken,
+      makerAmount: amount,
+      takerAsset: toToken,
+      triggerPrice: 0, // No trigger price for market orders
+      deadline: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+      isStopLoss: false,
+    };
+    // const signature = await signSLTPPosition(getSolverAccountByChainId(ChainId.BASE_CHAIN_ID), preparePosition)
+    return prepareSLTPPosition(preparePosition);
+  } catch (err) {
+    console.error('[sellPosition]', err);
+    throw new Error('Failed to sell position');
   }
 }
 

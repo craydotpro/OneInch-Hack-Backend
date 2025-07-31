@@ -36,11 +36,23 @@ const PositionSchema = new Schema({
   toToken: {
     type: String,
     enum: ['ETH', 'WBTC'],
+    required: false
+  },
+  fromTokenAddress: {
+    type: String,
+    required: false
+  },
+  toTokenAddress: {
+    type: String,
     required: true
+  },
+  executeOnChain: {
+    type: Number,
+    required: false
   },
   amountInUSD: {
     type: String,
-    required: true
+    required: false
   },
   qty: {
     type: String,
@@ -81,6 +93,20 @@ const PositionSchema = new Schema({
     type: String,
     required: false
   },
+  sellPositionTypedData: {
+    type: String,
+    required: false
+  },
+  signedSellPosition: [{
+    chainId: {
+      type: Number,
+      required: false,
+    },
+    data: {
+      type: String,
+      required: true,
+    }
+  }],
   advanceSLTP: {
     type: AdvanceSLTPSchema,
     required: false

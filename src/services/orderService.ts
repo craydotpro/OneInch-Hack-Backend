@@ -12,6 +12,7 @@ import { prepareOrder } from '../apis/helpers/order'
 import { prepareAllowancePermitData } from '../apis/helpers/permitERC20'
 import { generateSwapData } from '../apis/helpers/swap'
 import { fullfillOrder, getGasLimit, getOwnerSignOnOrder, submitOrder } from '../apis/helpers/web3'
+import { FusionAddresses } from '../config/contractAddresses'
 import { OrderStatus, ReadableStatus } from '../interfaces/enum'
 import { IOrderParams, IProcessOrderParams } from '../interfaces/orderParams'
 import { getSolverAccountByChainId } from '../utils/getWallets'
@@ -205,11 +206,12 @@ export async function processOrder(orderParams: IProcessOrderParams) {
       const isStable = isValidToken(orderParams.order.output.token, orderParams.order.output.chainId)
       if (!isStable) {
         swapData = await generateSwapData({
+          from: FusionAddresses[orderParams.order.output.chainId],
           chainId: orderParams.order.output.chainId,
           amount: orderParams.order.output.minAmountOut,
+          srcToken: tokenSymbolMap[`${orderParams.order.output.chainId}-USDC`].tokenAddress,
           toToken: orderParams.order.output.token,
           receiver: orderParams.order.output.recipient,
-          usdc: tokenSymbolMap[`${orderParams.order.output.chainId}-USDC`].tokenAddress
         })
       }
       if (!swapData) {
