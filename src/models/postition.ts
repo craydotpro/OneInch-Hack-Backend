@@ -15,6 +15,14 @@ export enum PositionType {
   LIMIT = 'limit'
 }
 
+export enum PositionStatus {
+  PENDING = 'pending',
+  ACTIVE = 'active',
+  EXECUTED = 'executed',
+  CANCELLED = 'cancelled',
+  FAILED = 'failed'
+}
+
 const PositionSchema = new Schema({
   type: {
     type: String,
@@ -50,10 +58,7 @@ const PositionSchema = new Schema({
     type: Number,
     required: false
   },
-  positionData: {
-    type: String,
-    required: false
-  },
+
   signedLimitOrder: [{
     chainId: {
       type: Number,
@@ -64,14 +69,26 @@ const PositionSchema = new Schema({
       required: true,
     }
   }],
+  limitOrderHash: {
+    type: String,
+    required: false
+  },
+  limitOrderData: {
+    type: String,
+    required: false
+  },
+  limitOrderTypedData: {
+    type: String,
+    required: false
+  },
   advanceSLTP: {
     type: AdvanceSLTPSchema,
     required: false
   },
   status: {
     type: String,
-    enum: ['pending', 'executed', 'cancelled', 'failed'],
-    default: 'pending'
+    enum: PositionStatus,
+    default: PositionStatus.PENDING
   },
   txHash: {
     type: String,
