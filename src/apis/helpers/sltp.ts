@@ -15,7 +15,6 @@ export const signSLTPPosition = (account: any, position: any) => {
       { name: "isStopLoss", type: "bool" },
     ],
   };
-  console.log('msg', position)
   return account.signTypedData({
     domain,
     types,

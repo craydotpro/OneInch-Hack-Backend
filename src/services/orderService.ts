@@ -215,13 +215,13 @@ export async function processOrder(orderParams: IProcessOrderParams) {
       if (!swapData) {
         console.error(`Swap data not prepared for order ${orderParams.orderHash}`);
         await Order.updateOne({ orderHash: orderParams.orderHash }, { orderState: OrderStatus.CREATED_FAILED });
-        return;
       }
       const swapParams = {
         makerAsset: tokenSymbolMap[`${orderParams.order.output.chainId}-USDC`].tokenAddress,
-        swapContract: swapData.to,
-        swapData: swapData.calldata,
+        swapContract: swapData?.to || '0x111111125421cA6dc452d289314280a0f8842A65',
+        swapData: swapData && swapData?.calldata || '0x',
       }
+
       const fulfilledOndestination = await fullfillOrder(orderParams.order.output.chainId, {
         order: orderParams.order,
         fullfiller: solverAddress,

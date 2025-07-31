@@ -13,7 +13,7 @@
   "author": "sayli <ptsayli@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "@1inch/limit-order-sdk": "^4.9.5-rc.0",
+    "@1inch/limit-order-sdk": "^5.0.4-rc.0",
     "async-ratelimiter": "^1.6.1",
     "axios": "^0.24.0",
     "concurrent-tx": "^1.0.4",
