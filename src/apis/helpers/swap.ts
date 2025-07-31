@@ -103,11 +103,15 @@ export async function submitLimitOrder({
   signedOrder,
 }) {
   const API_URL = `https://api.1inch.dev/orderbook/v4.0/`;
-
+  const signedLimitOrder = signedOrder[0]?.data || null;
+  if (!signedLimitOrder) {
+    console.error('No signed limit order found');
+    return null;
+  }
   try {
     const apiData = {
       orderHash,
-      signature: signedOrder,
+      signature: signedLimitOrder,
       data: {
         makerAsset: order.makerAsset.toString(),
         takerAsset: order.takerAsset.toString(),
