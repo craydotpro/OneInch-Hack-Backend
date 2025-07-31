@@ -13,7 +13,7 @@ const main = async () => {
       "toToken": "ETH",
       "type": "limit",
       "amountInUSD": "2",
-      "triggerPrice": "3861.8",
+      "triggerPrice": "4501.8",
     }
     
     const result = await axios.post("http://localhost:8000/api/prepare-buy", body)
