@@ -161,6 +161,7 @@ export async function createOrder(
 
 export async function processOrder(orderParams: IProcessOrderParams) {
   try {
+    let orderStatus = true
     console.log(`processing order: ${orderParams.orderHash}`);
 
     const prepareOrders = orderParams.order.inputs.map((input, index) => {
@@ -216,6 +217,7 @@ export async function processOrder(orderParams: IProcessOrderParams) {
       }
       if (!swapData) {
         console.error(`Swap data not prepared for order ${orderParams.orderHash}`);
+        orderStatus = false
         await Order.updateOne({ orderHash: orderParams.orderHash }, { orderState: OrderStatus.CREATED_FAILED });
       }
       const swapParams = {
@@ -243,12 +245,15 @@ export async function processOrder(orderParams: IProcessOrderParams) {
         console.log(`Fullfill Order ${orderParams.orderHash}, txHash: ${fulfilledOndestination.transactionHash} on chain ${orderParams.order.output.chainId} is ${fulfilledOndestination.status ? 'completed' : 'failed'}`);
         // @todo: settle order
       } else {
+        orderStatus = false
         await Order.updateOne({ orderHash: orderParams.orderHash }, { orderState: OrderStatus.FULFILLED_FAILED });
       }
     }
     else {
+      orderStatus = false
       await Order.updateOne({ orderHash: orderParams.orderHash }, { orderState: OrderStatus.CREATED_FAILED });
     }
+    return orderStatus
   } catch (error) {
     console.error(`Error at ${error} order for ${orderParams.orderHash}`, error);
   }

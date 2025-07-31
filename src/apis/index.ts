@@ -229,10 +229,11 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
         order: JSON.parse(updateSignedOrder.orderData),
         userSignature: updateSignedOrder.signedOrder,
       });
+      await Position.updateOne({ _id: id }, { status: order? PositionStatus.EXECUTED : PositionStatus.FAILED })
       positionStatus = position.type === PositionType.MARKET && order?.readableStatus === ReadableStatus.COMPLETED ? PositionStatus.EXECUTED : PositionStatus.FAILED;
     }
-    await Position.findByIdAndUpdate(
-      id,
+    await Position.updateOne(
+      { _id: id },
       {
         $set: {
           status: positionStatus,
