@@ -237,7 +237,7 @@ export async function processOrder(orderParams: IProcessOrderParams) {
           gasUsed: fulfilledOndestination.gasUsed,
           type: SubOrderType.OUTPUT,
         }
-        await Order.updateOne({ orderHash: orderParams.orderHash }, { status: ReadableStatus.COMPLETED, orderState: OrderStatus.FULFILLED, $push: { subOrders: outSuborder } });
+        await Order.updateOne({ orderHash: orderParams.orderHash }, { readableStatus: ReadableStatus.COMPLETED, status: OrderStatus.FULFILLED, $push: { subOrders: outSuborder } });
         console.log(`Fullfill Order ${orderParams.orderHash}, txHash: ${fulfilledOndestination.transactionHash} on chain ${orderParams.order.output.chainId} is ${fulfilledOndestination.status ? 'completed' : 'failed'}`);
         // @todo: settle order
       } else {
