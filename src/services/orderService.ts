@@ -100,7 +100,8 @@ export async function createOrder(
       const { typedOrder, orderHash, noOrder } = await prepareOrder(
         _id,
         { ...params, destinationToken, minAmountOut: minAmount },
-        balances
+        balances,
+        type,
       )
       if( noOrder ) {
         return { noOrder }

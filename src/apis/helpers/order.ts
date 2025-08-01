@@ -7,6 +7,7 @@ import r from "../../../redis"
 import { activeChainIds, chains } from "../../config/chainConfig"
 import { IDestinationAction, IInput, IOrder, IOutput } from "../../interfaces/order"
 import { IAccountBalance, ISpendBalance } from "../../interfaces/token"
+import { PositionType } from "../../models/postition"
 import { getTimestampInSeconds } from "../../utils"
 
 const CRAY_ORDR_TYPE_HASH = keccak256(stringToBytes("CrayOrder(Input[] inputs,Output output,address sender,uint256 nonce,uint32 initiateDeadline,uint32 fillDeadline,uint256 settlementExpiry,bytes32 metadata,DestinationAction action)DestinationAction(bytes payload,uint256 gasLimit)Input(uint256 chainId,address token,uint256 amount)Output(uint256 chainId,address token,uint256 minAmountOut,address recipient)"))
@@ -52,14 +53,14 @@ const TYPES = {
     ],
 }
 
-export const prepareOrder = async (orderId: Types.ObjectId, order: any, balances: IAccountBalance[]) => {
+export const prepareOrder = async (orderId: Types.ObjectId, order: any, balances: IAccountBalance[], type: PositionType) => {
   try {
     // get balance of user on all chains
     let orderAllocation = await calculateAllocation({ balances, amount: order.amount, toChainId: order.destinationChain })
     if(typeof orderAllocation==='boolean'){
       throw new Error('Transfer not possible')
     }
-    if (orderAllocation.length === 1 && orderAllocation[0].chainId === order.destinationChain) { 
+    if (type === PositionType.LIMIT && orderAllocation.length === 1 && orderAllocation[0].chainId === order.destinationChain) {
       return {noOrder: true} // no need to prepare order if only one chain is available and it is the destination chain
     }
     const totalSpending = orderAllocation.reduce((a:number, b: ISpendBalance)=>a + parseFloat(formatUnits(BigInt(b.spend), b.decimals)),0)
