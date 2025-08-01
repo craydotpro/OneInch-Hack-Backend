@@ -130,6 +130,8 @@ router.post('/prepare-sell', async (req: Request, res: Response) => {
     } = req.body;
     const sellingTokenAddress = getTokenAddress(sellingToken, sellingChain);
     const usdc = tokenSymbolMap[`${sellingChain}-USDC`].tokenAddress
+    let sltpOrderTypedData;
+
     const sellTypedData = await sellPosition({
       chainId: sellingChain,
       srcToken: sellingTokenAddress,
