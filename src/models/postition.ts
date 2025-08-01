@@ -110,7 +110,7 @@ const PositionSchema = new Schema({
     type: String,
     required: false
   },
-  signedSellPosition: [{
+  signedSellOrder: [{
     chainId: {
       type: Number,
       required: false,
