@@ -26,6 +26,7 @@ export interface ISubmitOrderParams {
   signedApprovalData?: [ISignedApprovalData] // signed approval data if needed
   signedLimitOrder?: { chainId: number, data: string }[] // signed limit order data if needed
   signedSellPosition?: { chainId: number, data: string }[] // signed sell position data if needed
+  signedSltpOrder?:any []
 }
 
 export interface ISignedApprovalData {
