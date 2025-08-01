@@ -253,7 +253,7 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
       updatePayload.qty = quantity || position.qty;
     }
     
-    if (signedLimitOrder) {
+    if (signedLimitOrder && signedLimitOrder.length) {
       const updatePosition = await Position.findByIdAndUpdate(
         id,
         {
@@ -275,7 +275,7 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
       updatePayload.status = orderInfo ? PositionStatus.ACTIVE : PositionStatus.FAILED;
     }
    
-    if (signedSltpOrder.length) {
+    if (signedSltpOrder && signedSltpOrder.length) {
       const state = await storeSLTPPositions(id, signedSltpOrder);
       updatePayload['advanceSLTP.tp.enabled'] = state;
       updatePayload['advanceSLTP.sl.enabled'] = state;
