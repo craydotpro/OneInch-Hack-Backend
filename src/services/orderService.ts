@@ -15,6 +15,7 @@ import { fullfillOrder, getGasLimit, getOwnerSignOnOrder, submitOrder } from '..
 import { FusionAddresses } from '../config/contractAddresses'
 import { OrderStatus, ReadableStatus } from '../interfaces/enum'
 import { IOrderParams, IProcessOrderParams } from '../interfaces/orderParams'
+import { PositionType } from '../models/postition'
 import { getSolverAccountByChainId } from '../utils/getWallets'
 
 require('dotenv').config()
@@ -23,6 +24,7 @@ require('dotenv').config()
 
 export async function createOrder(
   params: IOrderParams,
+  type: PositionType,
   testnet: boolean = false
 ) {
   try {
@@ -95,11 +97,14 @@ export async function createOrder(
       }
 
       // validate order else return null
-      const { typedOrder, orderHash } = await prepareOrder(
+      const { typedOrder, orderHash, noOrder } = await prepareOrder(
         _id,
         { ...params, destinationToken, minAmountOut: minAmount },
         balances
       )
+      if( noOrder ) {
+        return { noOrder }
+      }
       orderHashToSign = orderHash
       crayOrderDetails = typedOrder
       stringifiedOrder = JSON.stringify(typedOrder.message, (_, v) =>

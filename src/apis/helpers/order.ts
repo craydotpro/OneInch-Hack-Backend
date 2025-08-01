@@ -59,6 +59,9 @@ export const prepareOrder = async (orderId: Types.ObjectId, order: any, balances
     if(typeof orderAllocation==='boolean'){
       throw new Error('Transfer not possible')
     }
+    if (orderAllocation.length === 1 && orderAllocation[0].chainId === order.destinationChain) { 
+      return {noOrder: true} // no need to prepare order if only one chain is available and it is the destination chain
+    }
     const totalSpending = orderAllocation.reduce((a:number, b: ISpendBalance)=>a + parseFloat(formatUnits(BigInt(b.spend), b.decimals)),0)
     if(Math.abs(totalSpending-parseFloat(order.amount))>0.1){
       /** totalSpending and order.amount should be same. 
