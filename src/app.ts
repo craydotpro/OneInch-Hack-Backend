@@ -4,7 +4,7 @@ import listEndpoints from 'express-list-endpoints';
 
 import router from './apis';
 import connectDB from './config/database';
-
+import cors from 'cors';
 
 const app = express();
 
@@ -12,7 +12,12 @@ const PORT = process.env.PORT || 5001;
 
 // Connect to MongoDB
 connectDB();
-
+app.use(
+  cors({
+    credentials: true,
+    origin: ['http://localhost:5173'],
+  })
+);
 // Middleware
 app.use(express.json());
 
