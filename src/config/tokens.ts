@@ -1,6 +1,6 @@
-import { IToken } from "../interfaces/token"
-import { ActiveChains } from "./chains"
-
+import { IToken } from '../interfaces/token';
+import { ActiveChains } from './chains';
+export const MAINNET_USDC = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';
 export const tokenList: IToken[] = [
   // usdc
   {
@@ -317,18 +317,33 @@ export const tokenList: IToken[] = [
     isStable: true,
     gasless: false,
   },
-]
-export const tokenAddressMap = tokenList.reduce((obj: { [key: string]: IToken }, prop: IToken) => {
-  obj[prop.tokenAddress.toLowerCase()] = prop
-  return obj
-}, {})
+];
+export const tokenAddressMap = tokenList.reduce(
+  (obj: { [key: string]: IToken }, prop: IToken) => {
+    obj[prop.tokenAddress.toLowerCase()] = prop;
+    return obj;
+  },
+  {}
+);
+export const tokenChainAddressMap = tokenList.reduce(
+  (obj: { [key: string]: IToken }, prop: IToken) => {
+    if (!obj[prop.chainId]) obj[prop.chainId] = prop;
+    return obj;
+  },
+  {}
+);
 
-export const tokenSymbolMap = tokenList.reduce((obj: { [key: string]: IToken }, prop: IToken) => {
-  obj[`${prop.chainId}-${prop.symbol}`] = prop
-  return obj
-}, {})
+export const tokenSymbolMap = tokenList.reduce(
+  (obj: { [key: string]: IToken }, prop: IToken) => {
+    obj[`${prop.chainId}-${prop.symbol}`] = prop;
+    return obj;
+  },
+  {}
+);
 
 export const getSupportedTokens = () => {
-  return tokenList.filter(token => ActiveChains.includes(token.chainId))
-}
-export const isValidToken = (tokenAddress:string, chainId:number)=>tokenAddressMap[tokenAddress.toLowerCase()]?.chainId===chainId
+  return tokenList.filter((token) => ActiveChains.includes(token.chainId));
+};
+export const isValidToken = (tokenAddress: string, chainId: number) =>
+  tokenAddressMap[tokenAddress.toLowerCase()]?.chainId === chainId;
+export const getUSDCToken = (chainId) => tokenChainAddressMap[chainId];

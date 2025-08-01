@@ -472,4 +472,5 @@ router.get('/chart/:token', async (req: Request, res: Response) => {
     res.status(500).send('something went wrong');
   }
 });
+router.get('/insight', insightRouter);
 export default router;
