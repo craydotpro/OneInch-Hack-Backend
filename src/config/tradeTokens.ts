@@ -30,3 +30,17 @@ export function getTokenAddress(tokenSymbol: keyof typeof TradeTokensList, chain
   if (!addr) throw new Error(`Chain ${chainId} not supported for token ${tokenSymbol}`);
   return addr;
 }
+
+export function getTokenSymbolFromAddress(address: string): string | undefined {
+  const normalizedAddress = address.toLowerCase();
+
+  for (const [symbol, chainMap] of Object.entries(TradeTokensList)) {
+    for (const tokenAddress of Object.values(chainMap)) {
+      if (tokenAddress.toLowerCase() === normalizedAddress) {
+        return symbol;
+      }
+    }
+  }
+
+  return undefined; // or 'UNKNOWN'
+}
