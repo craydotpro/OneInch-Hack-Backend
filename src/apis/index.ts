@@ -2,6 +2,7 @@ import axios from 'axios';
 import { Request, Response, Router } from 'express';
 import { parseUnits } from 'viem';
 import { ENABLED_CHAIND_IDS } from '../../constant';
+import r from '../../redis';
 import execute1InchApi from '../../utils/limiter';
 import { ActiveChains, ChainId } from '../config/chains';
 import { VerifierContractAddresses } from '../config/contractAddresses';
@@ -11,14 +12,13 @@ import { OrderStatus, ReadableStatus } from '../interfaces/enum';
 import { ISubmitOrderParams } from '../interfaces/orderParams';
 import { AdvanceSLTP } from '../models/advancePositions';
 import { Order } from '../models/order';
-import { Position, PositionStatus, PositionType } from '../models/postition';
+import { Position, PositionStatus } from '../models/postition';
 import { createOrder, processOrder } from '../services/orderService';
 import { approveAllowance } from './helpers/permitERC20';
 import { prepareSLTPPosition } from './helpers/sltp';
 import { generateSwapData, prepareLimitOrder, sellPosition, submitLimitOrder } from './helpers/swap';
 import { executeSLTPPositions } from './helpers/web3';
 import insightRouter from './insight';
-import r from '../../redis';
 
 const router = Router({ mergeParams: true });
 
@@ -78,7 +78,7 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
           }));
     }
     // Create Order
-    const { data, message } = await createOrder(payParams) // if destination token is not stable, prep 1inch swap data
+    const { data, message, noOrder } = await createOrder(payParams, type) // if destination token is not stable, prep 1inch swap data
     if (message) {
       return res.status(500).json({ error: message })
     }
@@ -91,9 +91,9 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
       slippage: 0.5,
       triggerPrice,
       advanceSLTP,
-      sellingChain: buyingChain,
+      executeOnChain: buyingChain,
       deadline: Math.floor(Date.now() / 1000) + 300,
-      orderHash: data.orderHash,
+      orderHash: data?.orderHash || '0x',
       limitOrderHash,
       limitOrderData: JSON.stringify(limitOrderData),
       limitOrderTypedData: JSON.stringify(limitOrderTypedData),
@@ -145,6 +145,7 @@ router.post('/prepare-sell', async (req: Request, res: Response) => {
       // limitOrderData: JSON.stringify(limitOrderData),
       // limitOrderTypedData: JSON.stringify(limitOrderTypedData),
     };
+
     const position = await Position.create(positionParams);
     return res.json({
       result: { positionId: position._id, sellTypedData },
@@ -165,11 +166,12 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
       submitOrderParams;
     const position = await Position.findById(id);
     let order;
+    let orderInfo;
     let positionStatus= PositionStatus.PENDING;
     if (!position) {
       return res.status(404).json({ error: 'Position not found' });
     }
-    if (signedApprovalData) {
+    if (signedApprovalData && signedApprovalData.length) {
       await approveAllowance(signedApprovalData);
     }
     if (signedSellPosition && signedSellPosition.length) {
@@ -231,22 +233,9 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
         order: JSON.parse(updateSignedOrder.orderData),
         userSignature: updateSignedOrder.signedOrder,
       });
-      await Position.updateOne({ _id: id }, { status: order? PositionStatus.EXECUTED : PositionStatus.FAILED })
-      positionStatus = position.type === PositionType.MARKET && order?.readableStatus === ReadableStatus.COMPLETED ? PositionStatus.EXECUTED : PositionStatus.FAILED;
+      positionStatus = order ? PositionStatus.EXECUTED : PositionStatus.FAILED;
     }
-    await Position.updateOne(
-      { _id: id },
-      {
-        $set: {
-          status: positionStatus,
-        },
-      },
-    )
-    if (order && order?.readableStatus !== ReadableStatus.COMPLETED) {
-      return res.status(400).json({
-        error: `something went wrong in submitting position, Please try again later`,
-      });
-     }
+    
     if (signedLimitOrder) {
       const updatePosition = await Position.findByIdAndUpdate(
         id,
@@ -260,32 +249,31 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
         }
       );
       // call 1inch submit api
-      const orderInfo = await submitLimitOrder({
+      orderInfo = await submitLimitOrder({
         chainId: position.executeOnChain,
         orderHash: updatePosition.limitOrderHash,
         order: JSON.parse(updatePosition.limitOrderData),
         signedOrder: signedLimitOrder,
       });
-      const posStatus = orderInfo ? PositionStatus.ACTIVE : PositionStatus.FAILED;
-      await Position.findByIdAndUpdate(
-        id,
-        {
-          $set: {
-            status: posStatus,
-          },
+      positionStatus = orderInfo ? PositionStatus.ACTIVE : PositionStatus.FAILED;
+    }
+    await Position.updateOne(
+      { _id: id },
+      {
+        $set: {
+          status: positionStatus,
         },
-      );
-      if (!orderInfo) {
-        return res.status(400).json({
-          error: 'Failed to submit limit order',
-        });
-      }
-     
-      res.json({
-        result: { ...orderInfo },
-        message: 'Position submitted successfully',
+      },
+    )
+
+    if (!order && !orderInfo) {
+      return res.status(400).json({
+        error: `something went wrong in submitting position, Please try again later`,
       });
     }
+    res.json({
+      message: 'Position submitted successfully',
+    });
   } catch (err) {
     console.error('submitPosition', err);
     res.status(500).json({ error: 'Failed to submit position' });
