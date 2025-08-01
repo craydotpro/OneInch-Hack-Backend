@@ -3,10 +3,10 @@ import { Request, Response, Router } from 'express';
 import { parseUnits } from 'viem';
 import { ENABLED_CHAIND_IDS } from '../../constant';
 import execute1InchApi from '../../utils/limiter';
-import { ChainId } from '../config/chains';
+import { ActiveChains, ChainId } from '../config/chains';
 import { VerifierContractAddresses } from '../config/contractAddresses';
-import { isValidToken, tokenSymbolMap } from '../config/tokens';
-import { getTokenAddress } from '../config/tradeTokens';
+import { isValidToken, MAINNET_USDC, tokenSymbolMap } from '../config/tokens';
+import { getTokenAddress, TRADE_TOKENS_BY_CHAIN } from '../config/tradeTokens';
 import { OrderStatus, ReadableStatus } from '../interfaces/enum';
 import { ISubmitOrderParams } from '../interfaces/orderParams';
 import { AdvanceSLTP } from '../models/advancePositions';
@@ -17,6 +17,8 @@ import { approveAllowance } from './helpers/permitERC20';
 import { prepareSLTPPosition } from './helpers/sltp';
 import { generateSwapData, prepareLimitOrder, sellPosition, submitLimitOrder } from './helpers/swap';
 import { executeSLTPPositions } from './helpers/web3';
+import insightRouter from './insight';
+import r from '../../redis';
 
 const router = Router({ mergeParams: true });
 
@@ -392,4 +394,82 @@ router.get('/balance/:walletAddress', async (req: Request, res: Response) => {
   }
 });
 
+router.get(
+  '/balance/:walletAddress/:type',
+  async (req: Request, res: Response) => {
+    try {
+      const { walletAddress, type = 'STABLE_COINS' } = req.params;
+      let balance = await Promise.all(
+        ActiveChains.map(async (chainId) => {
+          let tokens = await execute1InchApi((ONE_INCH_KEY) =>
+            axios.get(
+              `https://api.1inch.dev/balance/v1.2/${chainId}/aggregatedBalancesAndAllowances/${
+                VerifierContractAddresses[chainId] || walletAddress
+              }`,
+              {
+                headers: {
+                  Authorization: `Bearer ${ONE_INCH_KEY}`,
+                },
+                params: {
+                  wallets: walletAddress,
+                  filterEmpty: 'true',
+                },
+              }
+            )
+          );
+          tokens.data.forEach((token) => {
+            token.chainId = chainId;
+          });
+          return tokens.data.filter((token) => {
+            if (type === 'STABLE_COINS')
+              return isValidToken(token.address, chainId);
+            else if (type == 'TRADING_COINS') {
+              const tradingTokenAddresses = new Set(
+                Object.values(TRADE_TOKENS_BY_CHAIN[chainId])
+              );
+              return tradingTokenAddresses.has(token.address);
+            }
+          });
+        })
+      );
+      balance = balance.flat();
+      res.send(balance);
+    } catch (err) {
+      console.error('[balance]', err);
+      res.status(500).json({ error: 'Failed to fetch balance' });
+    }
+  }
+);
+router.get('/chart/:token', async (req: Request, res: Response) => {
+  const { token } = req.params;
+  try {
+    const redisKey = `chart_data:${token}`;
+    let cachedToken = await r.get(redisKey);
+    if (cachedToken) {
+      return res.send(JSON.parse(cachedToken));
+    }
+    let tokens = await execute1InchApi((ONE_INCH_KEY) =>
+      axios.get(
+        `https://api.1inch.dev/charts/v1.0/chart/aggregated/candle/${getTokenAddress(
+          token as any,
+          1
+        )}/${MAINNET_USDC}/300/1`,
+        {
+          headers: {
+            Authorization: `Bearer ${ONE_INCH_KEY}`,
+          },
+          params: {
+            indexes: null,
+          },
+        }
+      )
+    );
+    await r.set(redisKey, JSON.stringify(tokens.data));
+    await r.expire(redisKey, 1 * 60);
+    res.send(tokens.data);
+  } catch (error) {
+    console.log(error);
+    res.status(500).send('something went wrong');
+  }
+});
 export default router;
