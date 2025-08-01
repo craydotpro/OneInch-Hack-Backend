@@ -44,7 +44,7 @@ const PositionSchema = new Schema({
   },
   toTokenAddress: {
     type: String,
-    required: true
+    required: false
   },
   executeOnChain: {
     type: Number,
