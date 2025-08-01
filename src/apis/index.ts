@@ -179,7 +179,6 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
     const { signedOrder, signedApprovalData, signedLimitOrder, signedSellPosition, signedSltpOrder } =
       submitOrderParams;
     const position = await Position.findById(id);
-    let orderStatus;
     let orderInfo;
     const updatePayload: any = {
       status: PositionStatus.PENDING,
@@ -288,7 +287,7 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
       },
     )
 
-    if (!orderStatus && !orderInfo) {
+    if (!updatePayload.orderStatus && !orderInfo) {
       return res.status(400).json({
         error: `something went wrong in submitting position, Please try again later`,
       });
