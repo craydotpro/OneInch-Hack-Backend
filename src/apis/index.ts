@@ -286,8 +286,7 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
         $set: updatePayload,
       },
     )
-
-    if (!updatePayload.orderStatus && !orderInfo) {
+    if (updatePayload.status !== 'executed' && !orderInfo) {
       return res.status(400).json({
         error: `something went wrong in submitting position, Please try again later`,
       });
