@@ -4,6 +4,7 @@ export enum AdvanceSLTPType {
   SL = 'sl',
   TP = 'tp'
 }
+
 const AdvanceSLTPSchema = new Schema({
   positionId: {
     type: Schema.Types.ObjectId,
@@ -25,8 +26,8 @@ const AdvanceSLTPSchema = new Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'executed', 'cancelled', 'failed'],
-    default: 'active'
+    enum: ['created','active', 'executed', 'cancelled', 'failed'],
+    default: 'created'
   },
   executedAt: {
     type: Date,

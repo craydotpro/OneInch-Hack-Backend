@@ -1,7 +1,7 @@
 import { model, Schema } from 'mongoose'
 
 const SLTPConfigSchema = new Schema({
-  enabled: { type: Boolean, required: true },
+  enabled: { type: Boolean, default: false, required: true },
   price: { type: Number, required: true }
 }, { _id: false })
 

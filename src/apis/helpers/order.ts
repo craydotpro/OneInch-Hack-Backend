@@ -258,6 +258,22 @@ export const hashOrder = (order: IOrder) => {
     )
 }
 
+
+export const getTokenQuantityFromLogs = (logs, tokenAddress, userAddress) => {
+  const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+  const userTopic = `0x${userAddress.toLowerCase().replace("0x", "").padStart(64, "0")}`;
+
+  const transferLog =logs.filter(log =>
+    log.topics[0] === TRANSFER_TOPIC &&
+    log.topics[2] === userTopic &&
+    log.address.toLowerCase() === tokenAddress.toLowerCase()
+  );
+  if (transferLog.length) {
+    return formatUnits(BigInt(transferLog[0].data), 18); // Assuming token has 18 decimals
+  }
+  return '0';
+}
+
 const moveElementToFirst = (elem: any, array: any[]) => {
   /** it moves any specific element from array to index 0 */
   const isExists = array.includes(elem)

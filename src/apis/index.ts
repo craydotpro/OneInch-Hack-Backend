@@ -13,6 +13,7 @@ import { ISubmitOrderParams } from '../interfaces/orderParams';
 import { AdvanceSLTP } from '../models/advancePositions';
 import { Order } from '../models/order';
 import { Position, PositionStatus, PositionType } from '../models/postition';
+import { processAdvanceOrder, storeSLTPPositions } from '../services/advanceOrderService';
 import { createOrder, processOrder } from '../services/orderService';
 import { approveAllowance } from './helpers/permitERC20';
 import { prepareSLTPPosition } from './helpers/sltp';
@@ -35,6 +36,7 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
       toToken, // ETH
       type, //market/limit
       amountInUSD,
+      amountInTokens = '0.000023',
       triggerPrice, // if limit order
       advanceSLTP,
     } = req.body;
@@ -48,6 +50,7 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
     let limitOrderData;
     let limitOrderHash;
     let limitOrderTypedData;
+    let sltpOrderTypedData;
     const buyingChain = ChainId.BASE_CHAIN_ID;
     const toTokenAddress = getTokenAddress(toToken, buyingChain);
     const payParams = {
@@ -78,7 +81,7 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
           }));
     }
     // Create Order
-    const { data, message, noOrder } = await createOrder(payParams, type) // if destination token is not stable, prep 1inch swap data
+    const { data, message } = await createOrder(payParams, type) // if destination token is not stable, prep 1inch swap data
     if (message) {
       return res.status(500).json({ error: message })
     }
@@ -88,7 +91,8 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
       type,
       amountInUSD,
       orderType : PositionType.BUY,
-      // qty: route.estimatedQty,
+      qty: amountInTokens,
+      toTokenAddress,
       slippage: 0.5,
       triggerPrice,
       advanceSLTP,
@@ -100,8 +104,11 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
       limitOrderTypedData: JSON.stringify(limitOrderTypedData),
     };
     const position = await Position.create(positionParams);
+    if (position.advanceSLTP) {
+       sltpOrderTypedData = await processAdvanceOrder(position);
+    }
     res.json({
-      result: { ...data, limitOrderTypedData, positionId: position._id },
+      result: { ...data, limitOrderTypedData, sltpOrderTypedData, positionId: position._id },
       message: 'Position prepared successfully',
     });
   } catch (err) {
@@ -136,6 +143,7 @@ router.post('/prepare-sell', async (req: Request, res: Response) => {
       type,
       // amountInUSD , // @todo: calculate amount in USD
       qty: amountInTokens,
+      fromTokenAddress: sellingTokenAddress,
       sellingToken,
       orderType: PositionType.SELL,
       executeOnChain: sellingChain,
@@ -150,6 +158,9 @@ router.post('/prepare-sell', async (req: Request, res: Response) => {
     };
 
     const position = await Position.create(positionParams);
+      if (position.advanceSLTP) {
+       sltpOrderTypedData = await processAdvanceOrder(position);
+    }
     return res.json({
       result: { positionId: position._id, sellTypedData },
       message: 'Sell Position prepared, Please Sign the position',
@@ -165,12 +176,16 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const submitOrderParams: ISubmitOrderParams = req.body;
-    const { signedOrder, signedApprovalData, signedLimitOrder, signedSellPosition } =
+    const { signedOrder, signedApprovalData, signedLimitOrder, signedSellPosition, signedSltpOrder } =
       submitOrderParams;
     const position = await Position.findById(id);
-    let order;
+    let orderStatus;
     let orderInfo;
-    let positionStatus= PositionStatus.PENDING;
+    const updatePayload: any = {
+      status: PositionStatus.PENDING,
+      qty: position.qty
+    };
+ 
     if (!position) {
       return res.status(404).json({ error: 'Position not found' });
     }
@@ -198,7 +213,6 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
         receiver: position.userAddress,
       });
       const p = position.sellPositionTypedData ? JSON.parse(position.sellPositionTypedData) : {};
-      console.log('ppppp', p);
       const pp = p.message
       const preparePosition = {
         ...pp,
@@ -206,7 +220,7 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
         swapData: swapData.calldata,
       }
       const txHash = await executeSLTPPositions(position.executeOnChain, preparePosition, signedSellPosition[0].data);
-      positionStatus = txHash?.status ? PositionStatus.EXECUTED : PositionStatus.FAILED;
+      updatePayload.status = txHash?.status ? PositionStatus.EXECUTED : PositionStatus.FAILED;
     }
     if (signedOrder && signedOrder.length) {
       const updateSignedOrder = await Order.findOneAndUpdate(
@@ -231,12 +245,13 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
           .status(404)
           .json({ error: 'Order not found or already processed' });
       }
-      order = await processOrder({
+      const { orderStatus, quantity } = await processOrder({
         orderHash: position.orderHash,
         order: JSON.parse(updateSignedOrder.orderData),
         userSignature: updateSignedOrder.signedOrder,
       });
-      positionStatus = order ? PositionStatus.EXECUTED : PositionStatus.FAILED;
+      updatePayload.status = orderStatus ? PositionStatus.EXECUTED : PositionStatus.FAILED;
+      updatePayload.qty = quantity || position.qty;
     }
     
     if (signedLimitOrder) {
@@ -258,18 +273,22 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
         order: JSON.parse(updatePosition.limitOrderData),
         signedOrder: signedLimitOrder,
       });
-      positionStatus = orderInfo ? PositionStatus.ACTIVE : PositionStatus.FAILED;
+      updatePayload.status = orderInfo ? PositionStatus.ACTIVE : PositionStatus.FAILED;
+    }
+   
+    if (signedSltpOrder.length) {
+      const state = await storeSLTPPositions(id, signedSltpOrder);
+      updatePayload['advanceSLTP.tp.enabled'] = state;
+      updatePayload['advanceSLTP.sl.enabled'] = state;
     }
     await Position.updateOne(
       { _id: id },
       {
-        $set: {
-          status: positionStatus,
-        },
+        $set: updatePayload,
       },
     )
 
-    if (!order && !orderInfo) {
+    if (!orderStatus && !orderInfo) {
       return res.status(400).json({
         error: `something went wrong in submitting position, Please try again later`,
       });
@@ -317,7 +336,6 @@ router.post('/sltp/:id', async (req: Request, res: Response) => {
       result: { positionId: position._id, data: advanceSLTP },
     });
   } catch (err) {
-    console.error('submitPosition', err);
     res.status(500).json({ error: 'Failed to submit position' });
   }
 });

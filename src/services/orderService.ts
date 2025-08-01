@@ -8,7 +8,7 @@ import { isValidToken, tokenSymbolMap } from '../config/tokens'
 
 
 import { getBalance } from '../apis/helpers/balance'
-import { prepareOrder } from '../apis/helpers/order'
+import { getTokenQuantityFromLogs, prepareOrder } from '../apis/helpers/order'
 import { prepareAllowancePermitData } from '../apis/helpers/permitERC20'
 import { generateSwapData } from '../apis/helpers/swap'
 import { fullfillOrder, getGasLimit, getOwnerSignOnOrder, submitOrder } from '../apis/helpers/web3'
@@ -168,6 +168,7 @@ export async function createOrder(
 export async function processOrder(orderParams: IProcessOrderParams) {
   try {
     let orderStatus = true
+    let tokenReceived
     console.log(`processing order: ${orderParams.orderHash}`);
 
     const prepareOrders = orderParams.order.inputs.map((input, index) => {
@@ -239,6 +240,8 @@ export async function processOrder(orderParams: IProcessOrderParams) {
       }, craySig, swapParams, orderParams.orderHash);
       // const fulfilledOndestination = await fulfilledOndestinationTx.wait();
       if (fulfilledOndestination.status) {
+        //@todo: get no of tokens receiver
+         tokenReceived = getTokenQuantityFromLogs(fulfilledOndestination.logs, orderParams.order.output.token, orderParams.order.output.recipient);
         const outSuborder = {
           chainId: orderParams.order.output.chainId,
           txHash: fulfilledOndestination.transactionHash,
@@ -246,6 +249,7 @@ export async function processOrder(orderParams: IProcessOrderParams) {
           fulfiller: solverAddress,
           gasUsed: fulfilledOndestination.gasUsed,
           type: SubOrderType.OUTPUT,
+          tokenReceived: tokenReceived,
         }
         await Order.updateOne({ orderHash: orderParams.orderHash }, { readableStatus: ReadableStatus.COMPLETED, status: OrderStatus.FULFILLED, $push: { subOrders: outSuborder } });
         console.log(`Fullfill Order ${orderParams.orderHash}, txHash: ${fulfilledOndestination.transactionHash} on chain ${orderParams.order.output.chainId} is ${fulfilledOndestination.status ? 'completed' : 'failed'}`);
@@ -259,7 +263,7 @@ export async function processOrder(orderParams: IProcessOrderParams) {
       orderStatus = false
       await Order.updateOne({ orderHash: orderParams.orderHash }, { orderState: OrderStatus.CREATED_FAILED });
     }
-    return orderStatus
+    return { orderStatus, quantity: tokenReceived }
   } catch (error) {
     console.error(`Error at ${error} order for ${orderParams.orderHash}`, error);
   }
