@@ -12,7 +12,9 @@ const AdvanceSLTPSchema = new Schema({
 
 export enum PositionType {
   MARKET = 'market',
-  LIMIT = 'limit'
+  LIMIT = 'limit',
+  BUY = 'buy',
+  SELL= 'sell',
 }
 
 export enum PositionStatus {
@@ -22,6 +24,7 @@ export enum PositionStatus {
   CANCELLED = 'cancelled',
   FAILED = 'failed'
 }
+
 
 const PositionSchema = new Schema({
   type: {
@@ -37,6 +40,16 @@ const PositionSchema = new Schema({
     type: String,
     enum: ['ETH', 'WBTC'],
     required: false
+  },
+  sellingToken: {
+    type: String,
+    enum: ['ETH', 'WBTC'],
+    required: false
+  },
+  orderType: {
+    type: String,
+    enum: PositionType,
+    default: PositionType.BUY
   },
   fromTokenAddress: {
     type: String,

@@ -60,8 +60,19 @@ insightRouter.get('/trade-history/:address', async (req, res) => {
       userAddress: address,
       status: { $in: [PositionStatus.EXECUTED, PositionStatus.FAILED, PositionStatus.CANCELLED] },
     }).sort({ createdAt: -1 });
-    console.log(tradeHistory);
-    res.send(tradeHistory);
+    const result = tradeHistory.map((trade) => {
+      return {
+        token: trade.toToken || trade.sellingToken,
+        side: trade.orderType,
+        // price: formatUnits(parseUnits(trade.takerRate, 18), 6),
+        amount: trade.amountInUSD,
+        qty: trade.qty,
+        createdAt: trade.createdAt.toISOString(),
+        status: trade.status,
+        chainId: trade.executeOnChain,
+      };
+    });
+    res.send(result);
   } catch (error) {
     console.log(error);
     res.status(500).send('something went wrong');
