@@ -12,7 +12,7 @@ import { OrderStatus, ReadableStatus } from '../interfaces/enum';
 import { ISubmitOrderParams } from '../interfaces/orderParams';
 import { AdvanceSLTP } from '../models/advancePositions';
 import { Order } from '../models/order';
-import { Position, PositionStatus } from '../models/postition';
+import { Position, PositionStatus, PositionType } from '../models/postition';
 import { createOrder, processOrder } from '../services/orderService';
 import { approveAllowance } from './helpers/permitERC20';
 import { prepareSLTPPosition } from './helpers/sltp';
@@ -87,6 +87,7 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
       toToken,
       type,
       amountInUSD,
+      orderType : PositionType.BUY,
       // qty: route.estimatedQty,
       slippage: 0.5,
       triggerPrice,
@@ -135,6 +136,8 @@ router.post('/prepare-sell', async (req: Request, res: Response) => {
       type,
       // amountInUSD , // @todo: calculate amount in USD
       qty: amountInTokens,
+      sellingToken,
+      orderType: PositionType.SELL,
       executeOnChain: sellingChain,
       slippage: 0.5,
       triggerPrice,
