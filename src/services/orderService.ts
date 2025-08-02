@@ -12,7 +12,7 @@ import { getTokenQuantityFromLogs, prepareOrder } from '../apis/helpers/order'
 import { prepareAllowancePermitData } from '../apis/helpers/permitERC20'
 import { generateSwapData } from '../apis/helpers/swap'
 import { fullfillOrder, getGasLimit, getOwnerSignOnOrder, submitOrder } from '../apis/helpers/web3'
-import { FusionAddresses } from '../config/contractAddresses'
+import { FusionAddresses, VerifierContractAddresses } from '../config/contractAddresses'
 import { OrderStatus, ReadableStatus } from '../interfaces/enum'
 import { IOrderParams, IProcessOrderParams } from '../interfaces/orderParams'
 import { PositionType } from '../models/postition'
@@ -139,6 +139,7 @@ export async function createOrder(
         await Promise.all(
           crayOrderDetails.message.inputs.map(async (input: any) =>
             prepareAllowancePermitData({
+              spenderAddress: VerifierContractAddresses[input.chainId],
               tokenAddress: input.token,
               ownerAddress: senderAddress,
               value: Number(input.amount),

@@ -1,8 +1,7 @@
-import { Hex } from "viem"
+import { encodeFunctionData, Hex } from "viem"
 
 import erc20Abi from "../../abis/erc20"
 import { chains } from "../../config/chainConfig"
-import { VerifierContractAddresses } from "../../config/contractAddresses"
 import { providers, walletClients } from "../../config/rpcProvider"
 import { getTimestampInSeconds } from "../../utils"
 import { getRelayerAccountByChainId } from "../../utils/getWallets"
@@ -11,11 +10,10 @@ import { getRelayerAccountByChainId } from "../../utils/getWallets"
 export const MAX_ALLOWANCE_VALUE = 100 * (10 ** 6)
 export const MIN_ALLOWANCE_VALUE = 10 ** 10
 
-export const prepareAllowancePermitData = async (params: { tokenAddress: any; ownerAddress: any; value: any; chainId: any }): Promise<any> => {
-  const { tokenAddress, ownerAddress, value, chainId } = params
+export const prepareAllowancePermitData = async (params: { spenderAddress: any; tokenAddress: any; ownerAddress: any; value: any; chainId: any }): Promise<any> => {
+  const { tokenAddress, ownerAddress, value, chainId, spenderAddress } = params
   const provider = providers[chainId]
   // VerifierContractAddresses
-  const spenderAddress = VerifierContractAddresses[chainId]
   const erc20Contract = {
     address: tokenAddress,
     abi: erc20Abi,
@@ -83,12 +81,13 @@ export const approveAllowance = (
     s: string
     verifyingContract: string
     walletAddress: string
+    spenderAddress: string
     value: number
     deadline: string
   }[]
 ) => {
   return Promise.all(
-    payload.map(async ({ chainId, verifyingContract, v, r, s, walletAddress, value, deadline }) => {
+    payload.map(async ({ chainId, verifyingContract, v, r, s, walletAddress, spenderAddress, value, deadline }) => {
       const provider = providers[chainId]
       const walletClient = walletClients[chainId]
       const account = getRelayerAccountByChainId(chainId)
@@ -97,10 +96,32 @@ export const approveAllowance = (
         address: verifyingContract as Hex,
         abi: erc20Abi,
         functionName: 'permit',
-        args: [walletAddress, VerifierContractAddresses[chainId], value, deadline, v, r, s],
+        args: [walletAddress, spenderAddress, value, deadline, v, r, s],
         chain: chains[chainId],
       })
       await provider.waitForTransactionReceipt({ hash })
     })
   )
+}
+
+  export const prepareApprove = async (params: {
+    tokenAddress: string
+    spenderAddress: string
+    ownerAddress: string
+    value: bigint
+    chainId: number
+  }) => {
+    const destinationCallData = encodeFunctionData({
+      abi: erc20Abi,
+      functionName: 'approve',
+      args: [params.spenderAddress, 100000],
+    })
+    const DESTINATION_ACTION_ADDRESS_ARB = '0x789AFb371459EeD6fE3C22F6d71EB58817C64098'
+
+    const relayRequest = {
+      chainId: chainId,
+      targetContract: tokenAddress,
+      callData: destinationCallData,
+      actionType: "1inch-swap",
+    };
 };

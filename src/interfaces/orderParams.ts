@@ -38,6 +38,7 @@ export interface ISignedApprovalData {
   walletAddress: string
   value: number
   deadline: string
+  spenderAddress: string
 }
 
 

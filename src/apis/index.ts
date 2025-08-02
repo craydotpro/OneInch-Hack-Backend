@@ -5,7 +5,7 @@ import { ENABLED_CHAIND_IDS } from '../../constant';
 import r from '../../redis';
 import execute1InchApi from '../../utils/limiter';
 import { ActiveChains, ChainId } from '../config/chains';
-import { FusionAddresses, VerifierContractAddresses } from '../config/contractAddresses';
+import { FusionAddresses, OneInchRouter, VerifierContractAddresses } from '../config/contractAddresses';
 import { isValidToken, MAINNET_USDC, tokenSymbolMap } from '../config/tokens';
 import { getTokenAddress, TRADE_TOKENS_BY_CHAIN } from '../config/tradeTokens';
 import { OrderStatus, ReadableStatus } from '../interfaces/enum';
@@ -15,7 +15,7 @@ import { Order } from '../models/order';
 import { Position, PositionStatus, PositionType } from '../models/postition';
 import { processAdvanceOrder, storeSLTPPositions } from '../services/advanceOrderService';
 import { createOrder, processOrder } from '../services/orderService';
-import { approveAllowance } from './helpers/permitERC20';
+import { approveAllowance, prepareAllowancePermitData } from './helpers/permitERC20';
 import { prepareSLTPPosition } from './helpers/sltp';
 import { generateSwapData, prepareLimitOrder, sellPosition, submitLimitOrder } from './helpers/swap';
 import { executeSLTPPositions } from './helpers/web3';
@@ -51,6 +51,7 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
     let limitOrderHash;
     let limitOrderTypedData;
     let sltpOrderTypedData;
+    let approvalTypedData = []
     const buyingChain = ChainId.BASE_CHAIN_ID;
     const toTokenAddress = getTokenAddress(toToken, buyingChain);
     const payParams = {
@@ -62,16 +63,25 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
       orderType: 'dapp', // dapp
     };
     if (type === 'limit') {
-      // @urgent @todo create order only if balance is fragmented:
       payParams.destinationToken = tokenSymbolMap[
         `${buyingChain}-USDC`
       ].tokenAddress;
+      const makerAsset = tokenSymbolMap[`${buyingChain}-USDC`].tokenAddress
+      //prepare approval of selling token to 1inch
+      const approvalData =await prepareAllowancePermitData({
+        tokenAddress: makerAsset,
+        spenderAddress: OneInchRouter[buyingChain],
+        ownerAddress: userAddress,
+        value: parseUnits(amountInUSD.toString(), 6), // assuming USDC has 6 decimals
+        chainId: buyingChain
+      })
+      approvalData && approvalTypedData.push(approvalData);
       (
         { limitOrderHash, limitOrderTypedData, limitOrderData } =
           await prepareLimitOrder({
             chainId: buyingChain,
             maker: userAddress,
-            makerAsset: tokenSymbolMap[`${buyingChain}-USDC`].tokenAddress,
+            makerAsset,
             takerAsset: toTokenAddress,
             makingAmount: parseUnits(amountInUSD.toString(), 6), // assuming USDC has 6 decimals
             takingAmount: parseUnits(
@@ -107,8 +117,9 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
     if (position.advanceSLTP) {
        sltpOrderTypedData = await processAdvanceOrder(position);
     }
+    data?.allowance && approvalTypedData.push(data.allowance.length && data.allowance);
     res.json({
-      result: { ...data, limitOrderTypedData, sltpOrderTypedData, positionId: position._id },
+      result: { ...data, approvalTypedData, limitOrderTypedData, sltpOrderTypedData, positionId: position._id },
       message: 'Position prepared successfully',
     });
   } catch (err) {
@@ -130,15 +141,49 @@ router.post('/prepare-sell', async (req: Request, res: Response) => {
     } = req.body;
     const sellingTokenAddress = getTokenAddress(sellingToken, sellingChain);
     const usdc = tokenSymbolMap[`${sellingChain}-USDC`].tokenAddress
+    let limitOrderData;
+    let limitOrderHash;
+    let spenderAddress = FusionAddresses[sellingChain];
+    let limitOrderTypedData;
     let sltpOrderTypedData;
-
-    const sellTypedData = await sellPosition({
-      chainId: sellingChain,
-      srcToken: sellingTokenAddress,
-      amount: parseUnits(amountInToken, 18),
-      toToken: usdc,
-      user: userAddress,
-    })
+    let approvalTypedData = []
+    let sellTypedData;
+    // prepare approval of selling token to gateway
+    
+    if (type === 'limit') {
+      //prepare approval of selling token to 1inch
+      spenderAddress = OneInchRouter[sellingChain];
+      console.log(amountInToken, triggerPrice, amountInToken / triggerPrice, Number(amountInToken / triggerPrice).toFixed(18));
+      (
+        { limitOrderHash, limitOrderTypedData, limitOrderData } =
+        await prepareLimitOrder({
+          chainId: sellingChain,
+          maker: userAddress,
+          makerAsset: sellingTokenAddress,
+          takerAsset: usdc,
+          makingAmount: parseUnits(amountInToken, 18),
+          takingAmount: parseUnits(
+            Number(amountInToken / triggerPrice).toFixed(18),
+            18
+          ),
+        }));
+    } else {
+      sellTypedData = await sellPosition({
+        chainId: sellingChain,
+        srcToken: sellingTokenAddress,
+        amount: parseUnits(amountInToken, 18),
+        toToken: usdc,
+        user: userAddress,
+      })
+    }
+    // figure way to approve tokens as permit is not supported for weth
+    // approvalTypedData.push(await prepareAllowancePermitData({
+    //   tokenAddress: sellingTokenAddress,
+    //   spenderAddress,
+    //   ownerAddress: userAddress,
+    //   value: parseUnits(amountInToken, 18),
+    //   chainId: sellingChain
+    // }));
     const positionParams = {
       userAddress,
       toTokenAddress: usdc,
@@ -154,17 +199,17 @@ router.post('/prepare-sell', async (req: Request, res: Response) => {
       advanceSLTP,
       deadline: Math.floor(Date.now() / 1000) + 3600,
       sellPositionTypedData: JSON.stringify(sellTypedData),
-      // limitOrderHash,
-      // limitOrderData: JSON.stringify(limitOrderData),
-      // limitOrderTypedData: JSON.stringify(limitOrderTypedData),
+      limitOrderHash,
+      limitOrderData: JSON.stringify(limitOrderData),
+      limitOrderTypedData: JSON.stringify(limitOrderTypedData),
     };
 
     const position = await Position.create(positionParams);
       if (position.advanceSLTP) {
        sltpOrderTypedData = await processAdvanceOrder(position);
-    }
+      }
     return res.json({
-      result: { positionId: position._id, sellTypedData },
+      result: { positionId: position._id, sellTypedData, limitOrderTypedData, sltpOrderTypedData, approvalTypedData },
       message: 'Sell Position prepared, Please Sign the position',
     });
   } catch (err) {

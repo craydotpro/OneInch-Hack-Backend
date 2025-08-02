@@ -25,7 +25,7 @@ export const VerifierContractAddresses = {
 
 export const RelayerContractAddresses = {
   [ChainId.ARB_SEPOLIA_CHAIN_ID]: "0xD00A2107cdAF050968cAC71c94FD667064d16b2e",
-  [ChainId.BASE_SEPOLIA_CHAIN_ID]: "0xe043Ad036d896e2d4c7341259617335e8eB22D7C"
+  [ChainId.BASE_CHAIN_ID]: "0xe349d4FeA36A2abe0911D111688EF4b618B34530"
 }
 
 
@@ -50,3 +50,8 @@ export const BalanceContractAddresses = {
   [ChainId.EUROPA_SKALE]: '0x2405692f026e787FF432b88547010ACd7cC9894A',
 }
 
+
+export const OneInchRouter = {
+  [ChainId.BASE_CHAIN_ID]: '0x111111125421cA6dc452d289314280a0f8842A65',
+  [ChainId.ARBITRUM_CHAIN_ID]: '0x111111125421cA6dc452d289314280a0f8842A65',
+}
