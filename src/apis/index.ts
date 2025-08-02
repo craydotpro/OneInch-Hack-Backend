@@ -5,7 +5,7 @@ import { ENABLED_CHAIND_IDS } from '../../constant';
 import r from '../../redis';
 import execute1InchApi from '../../utils/limiter';
 import { ActiveChains, ChainId } from '../config/chains';
-import { VerifierContractAddresses } from '../config/contractAddresses';
+import { FusionAddresses, VerifierContractAddresses } from '../config/contractAddresses';
 import { isValidToken, MAINNET_USDC, tokenSymbolMap } from '../config/tokens';
 import { getTokenAddress, TRADE_TOKENS_BY_CHAIN } from '../config/tradeTokens';
 import { OrderStatus, ReadableStatus } from '../interfaces/enum';
@@ -207,7 +207,7 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
       );
       const swapData = await generateSwapData({
         chainId: position.executeOnChain,
-        from: position.userAddress,
+        from: FusionAddresses[position.executeOnChain],
         srcToken: position.fromTokenAddress,
         toToken: position.toTokenAddress,
         amount: parseUnits(position.qty, 18),
