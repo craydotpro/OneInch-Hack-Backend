@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { Request, Response, Router } from 'express';
-import { parseUnits } from 'viem';
+import { formatUnits, parseUnits } from 'viem';
 import { ENABLED_CHAIND_IDS } from '../../constant';
 import r from '../../redis';
 import execute1InchApi from '../../utils/limiter';
@@ -15,6 +15,7 @@ import { Order } from '../models/order';
 import { Position, PositionStatus, PositionType } from '../models/postition';
 import { processAdvanceOrder, storeSLTPPositions } from '../services/advanceOrderService';
 import { createOrder, processOrder } from '../services/orderService';
+import { getTokenQuantityFromLogs } from './helpers/order';
 import { approveAllowance, prepareAllowancePermitData } from './helpers/permitERC20';
 import { prepareSLTPPosition } from './helpers/sltp';
 import { generateSwapData, prepareLimitOrder, sellPosition, submitLimitOrder } from './helpers/swap';
@@ -265,8 +266,10 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
         swapContract: swapData.to,
         swapData: swapData.calldata,
       }
-      const txHash = await executeSLTPPositions(position.executeOnChain, preparePosition, signedSellOrder[0].data);
-      updatePayload.status = txHash?.status ? PositionStatus.EXECUTED : PositionStatus.FAILED;
+      const receipt = await executeSLTPPositions(position.executeOnChain, preparePosition, signedSellOrder[0].data);
+      const tokenReceived = getTokenQuantityFromLogs(receipt.logs, position.toTokenAddress, position.userAddress);
+      updatePayload.amountInUSD = tokenReceived&& formatUnits(BigInt(tokenReceived), 6)
+      updatePayload.status = receipt?.status ? PositionStatus.EXECUTED : PositionStatus.FAILED;
     }
     if (signedOrder && signedOrder.length) {
       const updateSignedOrder = await Order.findOneAndUpdate(
