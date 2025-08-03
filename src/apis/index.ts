@@ -7,7 +7,7 @@ import execute1InchApi from '../../utils/limiter';
 import { ActiveChains, ChainId } from '../config/chains';
 import { FusionAddresses, OneInchRouter, VerifierContractAddresses } from '../config/contractAddresses';
 import { isValidToken, MAINNET_USDC, tokenSymbolMap } from '../config/tokens';
-import { getTokenAddress, TRADE_TOKENS_BY_CHAIN } from '../config/tradeTokens';
+import { getTokenAddress, getTokenSymbolFromAddress, TRADE_TOKENS_BY_CHAIN } from '../config/tradeTokens';
 import { OrderStatus, ReadableStatus } from '../interfaces/enum';
 import { ISubmitOrderParams } from '../interfaces/orderParams';
 import { AdvanceSLTP } from '../models/advancePositions';
@@ -489,6 +489,7 @@ router.get(
               if(isTradingToken){
                 token.balance = (Object.values(token.wallets)[0] as any).balance
                 token.price = allTokenPrices[token.chainId][token.address]
+                token.token = getTokenSymbolFromAddress(token.address) //getTokenSymbolFromAddress
                 return true
               }
             }
