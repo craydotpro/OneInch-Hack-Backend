@@ -117,7 +117,7 @@ router.post('/prepare-buy', async (req: Request, res: Response) => {
     if (position.advanceSLTP) {
        sltpOrderTypedData = await processAdvanceOrder(position);
     }
-    data?.allowance && approvalTypedData.push(data.allowance.length && data.allowance);
+    data?.allowance.length && approvalTypedData.push(data.allowance.length);
     res.json({
       result: { ...data, approvalTypedData, limitOrderTypedData, sltpOrderTypedData, positionId: position._id },
       message: 'Position prepared successfully',
