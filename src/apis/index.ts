@@ -474,14 +474,23 @@ router.get(
           tokens.data.forEach((token) => {
             token.chainId = chainId;
           });
+          let allTokenPrices = await r.hgetall("tokenPrice")
+          Object.keys(allTokenPrices).forEach(key=>{
+            allTokenPrices[key] = JSON.parse(allTokenPrices[key])
+          })
           return tokens.data.filter((token) => {
             if (type === 'STABLE_COINS')
               return isValidToken(token.address, chainId);
             else if (type == 'TRADING_COINS') {
               const tradingTokenAddresses = new Set(
-                Object.values(TRADE_TOKENS_BY_CHAIN[chainId])
+                Object.values(TRADE_TOKENS_BY_CHAIN[chainId]||{})
               );
-              return tradingTokenAddresses.has(token.address);
+              const isTradingToken = tradingTokenAddresses.has(token.address)
+              if(isTradingToken){
+                token.balance = (Object.values(token.wallets)[0] as any).balance
+                token.price = allTokenPrices[token.chainId][token.address]
+                return true
+              }
             }
           });
         })
