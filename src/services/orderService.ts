@@ -242,7 +242,7 @@ export async function processOrder(orderParams: IProcessOrderParams) {
       // const fulfilledOndestination = await fulfilledOndestinationTx.wait();
       if (fulfilledOndestination.status) {
         //@todo: get no of tokens receiver
-         tokenReceived = getTokenQuantityFromLogs(fulfilledOndestination.logs, orderParams.order.output.token, orderParams.order.output.recipient);
+         tokenReceived = getTokenQuantityFromLogs(fulfilledOndestination.logs, orderParams.order.output.token, orderParams.order.output.recipient,18);
         const outSuborder = {
           chainId: orderParams.order.output.chainId,
           txHash: fulfilledOndestination.transactionHash,

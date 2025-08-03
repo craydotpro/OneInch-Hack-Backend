@@ -259,7 +259,7 @@ export const hashOrder = (order: IOrder) => {
 }
 
 
-export const getTokenQuantityFromLogs = (logs, tokenAddress, userAddress) => {
+export const getTokenQuantityFromLogs = (logs, tokenAddress, userAddress, decimals) => {
   const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
   const userTopic = `0x${userAddress.toLowerCase().replace("0x", "").padStart(64, "0")}`;
 
@@ -269,7 +269,7 @@ export const getTokenQuantityFromLogs = (logs, tokenAddress, userAddress) => {
     log.address.toLowerCase() === tokenAddress.toLowerCase()
   );
   if (transferLog.length) {
-    return formatUnits(BigInt(transferLog[0].data), 18); // Assuming token has 18 decimals
+    return formatUnits(BigInt(transferLog[0].data), decimals); // Assuming token has 18 decimals
   }
   return '0';
 }

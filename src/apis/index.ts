@@ -153,8 +153,8 @@ router.post('/prepare-sell', async (req: Request, res: Response) => {
     
     if (type === 'limit') {
       //prepare approval of selling token to 1inch
+      console.log(123,Number(amountInToken) , Number(triggerPrice))
       spenderAddress = OneInchRouter[sellingChain];
-      console.log(amountInToken, triggerPrice, amountInToken / triggerPrice, Number(amountInToken / triggerPrice).toFixed(18));
       (
         { limitOrderHash, limitOrderTypedData, limitOrderData } =
         await prepareLimitOrder({
@@ -267,8 +267,8 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
         swapData: swapData.calldata,
       }
       const receipt = await executeSLTPPositions(position.executeOnChain, preparePosition, signedSellOrder[0].data);
-      const tokenReceived = getTokenQuantityFromLogs(receipt.logs, position.toTokenAddress, position.userAddress);
-      updatePayload.amountInUSD = tokenReceived&& formatUnits(BigInt(tokenReceived), 6)
+      const tokenReceived = getTokenQuantityFromLogs(receipt.logs, position.toTokenAddress, position.userAddress, 6);
+      updatePayload.amountInUSD = tokenReceived
       updatePayload.status = receipt?.status ? PositionStatus.EXECUTED : PositionStatus.FAILED;
     }
     if (signedOrder && signedOrder.length) {
