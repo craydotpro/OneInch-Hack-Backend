@@ -163,8 +163,8 @@ router.post('/prepare-sell', async (req: Request, res: Response) => {
           takerAsset: usdc,
           makingAmount: parseUnits(amountInToken, 18),
           takingAmount: parseUnits(
-            Number(amountInToken / triggerPrice).toFixed(18),
-            18
+            (Number(amountInToken) * Number(triggerPrice)).toFixed(18),
+            6
           ),
         }));
     } else {
