@@ -1,10 +1,10 @@
 import axios from 'axios';
 import { Router } from 'express';
-import { formatUnits, parseUnits } from 'viem';
+import { formatUnits } from 'viem';
 import execute1InchApi from '../../utils/limiter';
 import { ChainId } from '../config/chains';
 import { getTokenSymbolFromAddress } from '../config/tradeTokens';
-import { Position, PositionStatus, PositionType } from '../models/postition';
+import { Position, PositionStatus } from '../models/postition';
 
 const insightRouter = Router({ mergeParams: true });
 
@@ -23,22 +23,27 @@ insightRouter.get('/open-orders/:address', async (req, res) => {
           params: {
             page: 1,
             limit: 100,
-            statuses: '1,2',
+            statuses: '1',
             sortBy: 'createDateTime',
           },
         }
       )
     );
     const result = orders?.data.map((order: any) => {
+      const makerTokenSymbol = getTokenSymbolFromAddress(order.data.makerAsset);
       const takerTokenSymbol = getTokenSymbolFromAddress(order.data.takerAsset);
+      const token= takerTokenSymbol || makerTokenSymbol
+      const isBuy = takerTokenSymbol ? true: false;
+      const youPay = isBuy ? `$${parseFloat(formatUnits(order.data.makingAmount, 6))}` : `${token} ${parseFloat(formatUnits(order.data.makingAmount, 18)).toFixed(7)}`;
+      const youReceive = isBuy ? `${token} ${parseFloat(formatUnits(order.data.takingAmount, 18)).toFixed(7)}` : `$${parseFloat(formatUnits(order.data.takingAmount, 6))}`;
       const amount = formatUnits(order.makerBalance, 6);
-      const remainingAmount = formatUnits(order.remainingMakerAmount, 6);
+      const remainingAmount = isBuy?formatUnits(order.remainingMakerAmount, 1):formatUnits(order.remainingMakerAmount, 6);
       const note = amount < remainingAmount && 'Insufficient balance';
       return {
-        token: takerTokenSymbol,
-        OrderType: PositionType.LIMIT,
-        price: formatUnits(parseUnits(order.takerRate, 18), 6),
-        amount: remainingAmount.toString(),
+        token,
+        OrderType: isBuy? 'Buy' : 'Sell',
+        youPay: youPay,
+        youReceive: youReceive,
         note,
         createdAt: new Date(order.createDateTime).toISOString(),
         actions: ['Cancel'],
