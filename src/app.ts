@@ -22,8 +22,8 @@ app.use(
 app.use(express.json());
 
 // Routes
-app.use('/api', router);
-
+const slug = process.env.PRODUCTION==='true' ? "/1inch" : ""
+app.use(`${slug}/api`, router);
 
 // list endpoints
 console.log('-----------------------------------------')
