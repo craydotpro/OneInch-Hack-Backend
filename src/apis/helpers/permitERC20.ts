@@ -116,12 +116,12 @@ export const approveAllowance = (
       functionName: 'approve',
       args: [params.spenderAddress, 100000],
     })
-    const DESTINATION_ACTION_ADDRESS_ARB = '0x789AFb371459EeD6fE3C22F6d71EB58817C64098'
+    // const DESTINATION_ACTION_ADDRESS_ARB = '0x789AFb371459EeD6fE3C22F6d71EB58817C64098'
 
-    const relayRequest = {
-      chainId: chainId,
-      targetContract: tokenAddress,
-      callData: destinationCallData,
-      actionType: "1inch-swap",
-    };
+    // const relayRequest = {
+    //   chainId: chainId,
+    //   targetContract: tokenAddress,
+    //   callData: destinationCallData,
+    //   actionType: "1inch-swap",
+    // };
 };
