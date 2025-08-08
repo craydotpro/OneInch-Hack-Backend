@@ -341,9 +341,7 @@ router.post('/submit/:id', async (req: Request, res: Response) => {
         error: `something went wrong in submitting position, Please try again later`,
       });
     }
-    res.json({
-      message: 'Position submitted successfully',
-    });
+    res.json(position);
   } catch (err) {
     console.error('submitPosition', err);
     res.status(500).json({ error: 'Failed to submit position' });
