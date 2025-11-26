@@ -15,7 +15,7 @@ connectDB();
 app.use(
   cors({
     credentials: true,
-    origin: ['http://localhost:5173','https://1inch.cray.pro'],
+    origin: ['http://localhost:5173', 'https://swap.cray.pro'],
   })
 );
 // Middleware
